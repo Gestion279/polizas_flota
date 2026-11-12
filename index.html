@@ -36,15 +36,14 @@
       <p class="sub" id="hsub">Cargá la póliza, la factura y la base de CC para ver cuánto le toca a cada centro de costo.</p>
       <div class="tabs" role="tablist" id="tabs" hidden>
         <button role="tab" id="t-cc" aria-selected="true" type="button">Totales por CC</button>
-        <button role="tab" id="t-pat" aria-selected="false" type="button">Patentes y asignación <span class="cnt" id="t-cnt" hidden></span></button>
+        <button role="tab" id="t-pat" aria-selected="false" type="button">Patentes<span class="t-long"> y asignación</span> <span class="cnt" id="t-cnt" hidden></span></button>
       </div>
     </div>
     <div class="hright">
       <select class="txt" id="per" aria-label="Período" hidden></select>
       <button class="btn" id="newper" type="button" hidden>Cargar nuevo período</button>
       <button class="btn primary" id="exp" type="button" hidden>Exportar a Excel</button>
-      <div class="sync user"><span id="uemail"></span><button class="linkbtn" type="button" id="logout">Salir</button></div>
-      
+      <div class="user"><span id="uemail"></span><button class="linkbtn" type="button" id="logout">Salir</button></div>
     </div>
   </header>
 
@@ -53,7 +52,7 @@
     <h2>Cargar período</h2>
     <p>Subí los archivos de la renovación: la póliza y la factura en PDF, la base de centros de costo y la base de zonas por patente en Excel. Podés arrastrarlos juntos; la aplicación reconoce cuál es cuál. Las patentes que ya tenían CC en el período anterior lo conservan.</p>
     <div class="drop" id="drop" tabindex="0" role="button" aria-label="Elegir archivos">
-      <b>Arrastrá los archivos acá o hacé clic para elegirlos</b>
+      <b><span class="t-fine">Arrastrá los archivos acá o hacé clic para elegirlos</span><span class="t-touch">Tocá para elegir los archivos</span></b>
       Póliza (.pdf), factura (.pdf), base de CC (.xlsx) y zonas por patente (.xlsx)
     </div>
     <input type="file" id="files" multiple accept=".pdf,.xlsx,.xls" hidden>
@@ -98,27 +97,36 @@
 
       <div id="patview" hidden>
         <div class="toolbar">
-          <input class="txt" id="q" type="search" placeholder="Buscar patente, marca o CC" style="min-width:220px">
-          <select class="txt" id="fil" aria-label="Filtro por centro de costo" style="max-width:270px"></select>
-          <select class="txt" id="zf" aria-label="Zona" style="max-width:250px"><option value="">Todas las zonas</option></select>
+          <input class="txt fq" id="q" type="search" placeholder="Buscar patente, marca o CC" aria-label="Buscar">
+          <select class="txt fsel" id="fil" aria-label="Filtro por centro de costo"></select>
+          <select class="txt fsel" id="zf" aria-label="Zona"><option value="">Todas las zonas</option></select>
+          <select class="txt fsel only-m" id="sortsel" aria-label="Ordenar">
+            <option value="cert:1">Ordenar por certificado</option>
+            <option value="patente:1">Ordenar por patente</option>
+            <option value="total:-1">Mayor total primero</option>
+            <option value="total:1">Menor total primero</option>
+            <option value="cc:1">Ordenar por centro de costo</option>
+            <option value="zona:1">Ordenar por zona</option>
+            <option value="marca:1">Ordenar por marca</option>
+          </select>
           <button class="btn" id="fclear" type="button" hidden>Limpiar filtros</button>
-          <label style="font-size:13px;display:flex;gap:6px;align-items:center;color:var(--muted)"><input type="checkbox" id="showoff"> Ofrecer CC inhabilitados</label>
-          <span style="flex:1"></span>
-          <button class="btn" id="impz" type="button">Actualizar zonas</button>
+          <label class="offchk"><input type="checkbox" id="showoff"> Ofrecer CC inhabilitados</label>
+          <span class="grow"></span>
+          <button class="btn imp" id="impz" type="button">Actualizar zonas</button>
           <input type="file" id="impzf" accept=".xlsx,.xls" hidden>
-          <button class="btn" id="imp" type="button">Importar asignaciones</button>
+          <button class="btn imp" id="imp" type="button">Importar asignaciones</button>
           <input type="file" id="impf" accept=".xlsx,.xls,.csv" hidden>
         </div>
         <div class="bulk" id="bulk">
           <b id="bulk-n"></b>
-          <div class="cc" style="min-width:300px"><input id="bulk-cc" list="cclist" placeholder="Centro de costo para todas" aria-label="Centro de costo para las seleccionadas"></div>
+          <div class="cc bulk-cc"><input id="bulk-cc" list="cclist" placeholder="Centro de costo para todas" aria-label="Centro de costo para las seleccionadas"></div>
           <button class="btn primary" id="bulk-ok" type="button">Asignar a seleccionadas</button>
           <button class="btn" id="bulk-clear" type="button">Quitar CC</button>
           <button class="btn" id="bulk-x" type="button">Cancelar selección</button>
         </div>
         <div class="tablewrap"><table>
           <thead><tr>
-            <th style="width:34px"><input type="checkbox" id="all" aria-label="Seleccionar visibles"></th>
+            <th class="th-chk"><label class="selall"><input type="checkbox" id="all" aria-label="Seleccionar visibles"><span class="only-m">Seleccionar las visibles</span></label></th>
             <th data-sort="cert">Cert.</th><th data-sort="patente">Patente</th><th data-sort="marca">Marca completa</th><th data-sort="zona">Zona</th><th data-sort="cc">Centro de costo</th>
             <th class="num" data-sort="base" id="th-base">Premio certificado</th><th class="num" data-sort="pct">%</th>
             <th class="num" data-sort="neto">Neto</th><th class="num" data-sort="iva">IVA</th><th class="num" data-sort="perc">Perc. IVA</th>
