@@ -1,6 +1,6 @@
 {
-  "name": "Seguros automotor por centro de costo",
-  "short_name": "Seguros CC",
+  "name": "Pólizas flota vehicular",
+  "short_name": "Pólizas flota",
   "lang": "es-AR",
   "start_url": "/",
   "display": "standalone",
