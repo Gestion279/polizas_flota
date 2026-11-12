@@ -1,0 +1,23 @@
+{
+  "name": "seguros-cc",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Prorrateo de la póliza de seguros automotor por patente y centro de costo",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.118.0",
+    "pdfjs-dist": "6.4.299",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "vite": "8.3.5"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}

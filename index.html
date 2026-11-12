@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Seguros automotor por centro de costo</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚚</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="wrap">
+  <!-- ACCESO -->
+  <section class="panel login" id="login" hidden>
+    <h1>Seguros automotor por centro de costo</h1>
+    <p>Ingresá con tu usuario de la empresa.</p>
+    <form id="loginf" novalidate>
+      <label for="lemail">Email</label>
+      <input class="txt" id="lemail" type="email" autocomplete="username" required>
+      <label for="lpass">Contraseña</label>
+      <input class="txt" id="lpass" type="password" autocomplete="current-password" required>
+      <button class="btn primary" type="submit" id="lbtn">Ingresar</button>
+      <div class="err" id="lerr" role="alert"></div>
+    </form>
+  </section>
+  <section class="panel login" id="noacc" hidden>
+    <h1>Sin acceso</h1>
+    <p id="noacc-t"></p>
+    <button class="btn" type="button" id="noacc-out">Salir</button>
+  </section>
+  <div class="loading" id="loading">Cargando…</div>
+
+  <div id="app" hidden>
+  <header class="top">
+    <div>
+      <h1>Seguros automotor por centro de costo</h1>
+      <p class="sub" id="hsub">Cargá la póliza, la factura y la base de CC para ver cuánto le toca a cada centro de costo.</p>
+    </div>
+    <div class="hright">
+      <select class="txt" id="per" aria-label="Período" hidden></select>
+      <button class="btn" id="newper" type="button" hidden>Cargar nuevo período</button>
+      <div class="sync user"><span id="uemail"></span><button class="linkbtn" type="button" id="logout">Salir</button></div>
+    </div>
+  </header>
+
+  <!-- UPLOAD -->
+  <section class="panel upload" id="upload" hidden>
+    <h2>Cargar período</h2>
+    <p>Subí los archivos de la renovación: la póliza y la factura en PDF, la base de centros de costo y la base de zonas por patente en Excel. Podés arrastrarlos juntos; la aplicación reconoce cuál es cuál. Las patentes que ya tenían CC en el período anterior lo conservan.</p>
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Elegir archivos">
+      <b>Arrastrá los archivos acá o hacé clic para elegirlos</b>
+      Póliza (.pdf), factura (.pdf), base de CC (.xlsx) y zonas por patente (.xlsx)
+    </div>
+    <input type="file" id="files" multiple accept=".pdf,.xlsx,.xls" hidden>
+    <div class="slots">
+      <div class="slot" id="s-poliza"><h3>Póliza <span class="st wait">Falta</span></h3><div class="fn"></div><div class="info"></div><div class="mini" hidden><i></i></div></div>
+      <div class="slot" id="s-factura"><h3>Factura <span class="st wait">Falta</span></h3><div class="fn"></div><div class="info"></div></div>
+      <div class="slot" id="s-cc"><h3>Base de CC <span class="st wait">Falta</span></h3><div class="fn"></div><div class="info"></div></div>
+      <div class="slot" id="s-zona"><h3>Zonas <span class="st wait">Opcional</span></h3><div class="fn"></div><div class="info"></div></div>
+    </div>
+    <ul class="checks" id="checks"></ul>
+    <div class="uactions">
+      <button class="btn primary" id="save" type="button" disabled>Guardar y ver totales por CC</button>
+      <button class="btn" id="cancel" type="button" hidden>Volver al período actual</button>
+      <span class="note" id="savenote"></span>
+    </div>
+  </section>
+
+  <!-- MAIN -->
+  <div id="main" hidden>
+    <section class="panel invoice" aria-label="Factura">
+      <div class="inv-id">
+        <div class="n" id="i-num"></div>
+        <dl id="i-dl"></dl>
+      </div>
+      <div class="amounts" id="i-amts"></div>
+    </section>
+
+    <section class="panel">
+      <div class="bar-top">
+        <div class="tabs" role="tablist">
+          <button role="tab" id="t-cc" aria-selected="true" type="button">Totales por CC</button>
+          <button role="tab" id="t-pat" aria-selected="false" type="button">Patentes y asignación <span class="cnt" id="t-cnt" hidden></span></button>
+        </div>
+        <div class="ctl">
+          <div class="progress"><span>Asignadas</span><div class="bar"><i id="pg-bar"></i></div><b id="pg-txt"></b></div>
+          <span class="lbl">Prorratear por</span>
+          <div class="seg" role="group" aria-label="Base del prorrateo">
+            <button type="button" data-m="valor" aria-pressed="true">Valor del vehículo</button>
+            <button type="button" data-m="premio" aria-pressed="false">Premio del certificado</button>
+          </div>
+          <button class="btn primary" id="exp" type="button">Exportar a Excel</button>
+        </div>
+      </div>
+
+      <div id="ccview">
+        <div class="tablewrap"><table>
+          <thead><tr><th>Centro de costo</th><th>Descripción</th><th>Participación</th><th class="num">Patentes</th><th class="num">Neto</th><th class="num">IVA</th><th class="num">Perc. IVA</th><th class="num">Otros imp.</th><th class="num">Total</th></tr></thead>
+          <tbody id="ccb"></tbody>
+          <tfoot id="ccf"></tfoot>
+        </table></div>
+      </div>
+
+      <div id="patview" hidden>
+        <div class="toolbar">
+          <input class="txt" id="q" type="search" placeholder="Buscar patente, marca o CC" style="min-width:220px">
+          <select class="txt" id="fil" aria-label="Filtro" style="max-width:240px">
+            <option value="all">Todas las patentes</option>
+            <option value="none">Sin centro de costo</option>
+            <option value="done">Con centro de costo</option>
+            <option value="bad">Con CC inválido o inhabilitado</option>
+            <option value="new">Nuevas en este período</option>
+          </select>
+          <select class="txt" id="zf" aria-label="Zona" style="max-width:220px"><option value="">Todas las zonas</option></select>
+          <label style="font-size:13px;display:flex;gap:6px;align-items:center;color:var(--muted)"><input type="checkbox" id="showoff"> Ofrecer CC inhabilitados</label>
+          <span style="flex:1"></span>
+          <button class="btn" id="impz" type="button">Actualizar zonas</button>
+          <input type="file" id="impzf" accept=".xlsx,.xls" hidden>
+          <button class="btn" id="imp" type="button">Importar asignaciones</button>
+          <input type="file" id="impf" accept=".xlsx,.xls,.csv" hidden>
+        </div>
+        <div class="bulk" id="bulk">
+          <b id="bulk-n"></b>
+          <div class="cc" style="min-width:300px"><input id="bulk-cc" list="cclist" placeholder="Centro de costo para todas" aria-label="Centro de costo para las seleccionadas"></div>
+          <button class="btn primary" id="bulk-ok" type="button">Asignar a seleccionadas</button>
+          <button class="btn" id="bulk-clear" type="button">Quitar CC</button>
+          <button class="btn" id="bulk-x" type="button">Cancelar selección</button>
+        </div>
+        <div class="tablewrap"><table>
+          <thead><tr>
+            <th style="width:34px"><input type="checkbox" id="all" aria-label="Seleccionar visibles"></th>
+            <th data-sort="cert">Cert.</th><th data-sort="patente">Patente</th><th data-sort="marca">Marca completa</th><th data-sort="zona">Zona</th>
+            <th class="num" data-sort="base" id="th-base">Valor del vehículo</th><th class="num" data-sort="pct">%</th>
+            <th class="num" data-sort="neto">Neto</th><th class="num" data-sort="iva">IVA</th><th class="num" data-sort="perc">Perc. IVA</th>
+            <th class="num" data-sort="otros">Otros imp.</th><th class="num" data-sort="total">Total</th><th data-sort="cc">Centro de costo</th>
+          </tr></thead>
+          <tbody id="tb"></tbody>
+          <tfoot id="tf"></tfoot>
+        </table></div>
+      </div>
+      <datalist id="cclist"></datalist>
+    </section>
+  </div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
