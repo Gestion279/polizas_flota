@@ -165,7 +165,7 @@ function renderAll() {
 }
 function renderInvoice(p) {
   $("i-num").textContent = "Factura " + p.id;
-  $("i-dl").innerHTML = `<dt>Fecha</dt><dd>${esc(isoToAr(p.factura_fecha))}</dd><dt>Detalle</dt><dd>${esc(p.factura_detalle || "")}</dd><dt>Base de CC</dt><dd>${esc(S.bases.centros_costo?.archivo || "")}</dd>${p.creado_por ? `<dt>Cargado por</dt><dd>${esc(p.creado_por)}</dd>` : ""}`;
+  $("i-dl").innerHTML = `<dt>Fecha</dt><dd>${esc(isoToAr(p.factura_fecha))}</dd><dt>Detalle</dt><dd>${esc(p.factura_detalle || "")}</dd>`;
   const T = +p.neto + +p.iva + +p.percepcion + +p.otros_impuestos;
   const cuadra = Math.abs(rows.reduce((a, r) => a + r.total, 0) - T) < 0.005;
   $("i-amts").innerHTML = [
@@ -202,29 +202,56 @@ function renderCC() {
   const s = k => rows.reduce((a, r) => a + r[k], 0);
   $("ccf").innerHTML = `<tr><td>Total</td><td>${g.filter(x => x.cc).length} centros de costo</td><td></td><td class="num">${rows.length}</td><td class="num">${fmt(s("neto"))}</td><td class="num">${fmt(s("iva"))}</td><td class="num">${fmt(s("perc"))}</td><td class="num">${fmt(s("otros"))}</td><td class="num big">$ ${fmt(s("total"))}</td></tr>`;
 }
+/* Filtros encadenados: cada lista muestra solo lo que existe con los demás filtros aplicados */
+const FILS = [["all", "Todas las patentes"], ["none", "Sin centro de costo"], ["done", "Con centro de costo"], ["bad", "Con CC inválido o inhabilitado"], ["new", "Nuevas en este período"]];
+function matchQ(r) {
+  const q = S.q.trim().toLowerCase(); if (!q) return true;
+  const cd = ccMap.get(r.cc);
+  return (r.patente + " " + r.marca + " " + (r.zona || "") + " " + (r.cc || "") + " " + (cd ? cd.d : "")).toLowerCase().includes(q);
+}
+function matchFil(r, f) {
+  if (f === "none") return !r.cc;
+  if (f === "done") return !!r.cc;
+  if (f === "bad") { const st = ccStatus(r.cc).cls; return st === "bad" || st.includes("off"); }
+  if (f === "new") return !!r.nuevo;
+  return true;
+}
+function matchZ(r, z) {
+  if (!z) return true;
+  return z === "__none" ? !r.zona : r.zona === z;
+}
 function visible() {
-  const q = S.q.toLowerCase();
-  const v = rows.filter(r => {
-    if (q) { const cd = ccMap.get(r.cc); if (!(r.patente + " " + r.marca + " " + r.zona + " " + r.cc + " " + (cd ? cd.d : "")).toLowerCase().includes(q)) return false; }
-    const st = ccStatus(r.cc).cls;
-    if (S.fil === "none" && r.cc) return false;
-    if (S.fil === "done" && !r.cc) return false;
-    if (S.fil === "bad" && !(st === "bad" || st.includes("off"))) return false;
-    if (S.fil === "new" && !r.nuevo) return false;
-    if (S.zf === "__none" ? r.zona : (S.zf && r.zona !== S.zf)) return false;
-    return true;
-  });
+  const v = rows.filter(r => matchQ(r) && matchFil(r, S.fil) && matchZ(r, S.zf));
   const { k, dir } = S.sort;
-  return v.sort((a, b) => { const x = a[k], y = b[k]; return (typeof x === "number" ? x - y : String(x).localeCompare(String(y), "es")) * dir; });
+  return v.sort((a, b) => { const x = a[k] ?? "", y = b[k] ?? ""; return (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "es")) * dir; });
 }
 function fillZonas() {
-  const zs = [...new Set(rows.map(r => r.zona).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
-  const sinZ = rows.filter(r => !r.zona).length;
-  if (S.zf && S.zf !== "__none" && !zs.includes(S.zf)) S.zf = "";
-  $("zf").innerHTML = `<option value="">Todas las zonas</option>` + zs.map(z => `<option ${z === S.zf ? "selected" : ""}>${esc(z)}</option>`).join("") + (sinZ ? `<option value="__none" ${S.zf === "__none" ? "selected" : ""}>Sin zona (${sinZ})</option>` : "");
+  // Zonas de los vehículos que cumplen la búsqueda y el filtro de CC
+  const base = rows.filter(r => matchQ(r) && matchFil(r, S.fil));
+  const cnt = new Map(); let sinZ = 0;
+  base.forEach(r => { if (r.zona) cnt.set(r.zona, (cnt.get(r.zona) || 0) + 1); else sinZ++; });
+  const zs = [...cnt.keys()].sort((a, b) => a.localeCompare(b, "es"));
+  if (S.zf && S.zf !== "__none" && !cnt.has(S.zf)) S.zf = "";
+  if (S.zf === "__none" && !sinZ) S.zf = "";
+  $("zf").innerHTML = (base.length ? `<option value="">Todas las zonas (${base.length})</option>` : `<option value="">Sin zonas para este filtro</option>`)
+    + zs.map(z => `<option value="${esc(z)}">${esc(z)} (${cnt.get(z)})</option>`).join("")
+    + (sinZ ? `<option value="__none">Sin zona (${sinZ})</option>` : "");
+  $("zf").value = S.zf;
+  $("zf").disabled = !base.length;
+}
+function fillFil() {
+  // Estados de CC de los vehículos que cumplen la búsqueda y la zona
+  const base = rows.filter(r => matchQ(r) && matchZ(r, S.zf));
+  $("fil").innerHTML = FILS.map(([v, l]) => {
+    const n = base.filter(r => matchFil(r, v)).length;
+    const dis = n === 0 && v !== "all" && v !== S.fil;
+    return `<option value="${v}" ${dis ? "disabled" : ""}>${l} (${n})</option>`;
+  }).join("");
+  $("fil").value = S.fil;
+  $("fclear").hidden = !(S.fil !== "all" || S.zf || S.q.trim());
 }
 function renderPat() {
-  fillZonas();
+  fillZonas(); fillFil();
   const v = visible();
   $("tb").innerHTML = !v.length ? `<tr><td colspan="13" class="empty">Ninguna patente coincide con la búsqueda o el filtro.</td></tr>` :
     v.map(r => {
@@ -234,13 +261,13 @@ function renderPat() {
       <td><span class="plate"><span>${esc(r.patente)}</span></span>${r.nuevo ? '<span class="new">Nueva</span>' : ""}</td>
       <td class="marca">${esc(r.marca)}<small>${esc(r.anio)}</small></td>
       <td>${r.zona ? `<span class="zona">${esc(r.zona)}</span>` : `<span class="zona none">Sin zona</span>`}</td>
+      <td><div class="cc ${st.cls}"><input class="ccin" list="cclist" value="${esc(r.cc)}" placeholder="Elegí o escribí el CC" aria-label="Centro de costo de ${esc(r.patente)}"><small title="${esc(st.txt)}">${esc(st.txt)}</small></div></td>
       <td class="num">${fmt(r.base)}</td><td class="num">${fmtPct(r.pct)}</td>
       <td class="num">${fmt(r.neto)}</td><td class="num">${fmt(r.iva)}</td><td class="num">${fmt(r.perc)}</td><td class="num">${fmt(r.otros)}</td>
-      <td class="num tot">${fmt(r.total)}</td>
-      <td><div class="cc ${st.cls}"><input class="ccin" list="cclist" value="${esc(r.cc)}" placeholder="Elegí o escribí el CC" aria-label="Centro de costo de ${esc(r.patente)}"><small title="${esc(st.txt)}">${esc(st.txt)}</small></div></td></tr>`;
+      <td class="num tot">${fmt(r.total)}</td></tr>`;
     }).join("");
   const s = k => v.reduce((a, r) => a + r[k], 0);
-  $("tf").innerHTML = `<tr><td></td><td colspan="4">${v.length !== rows.length ? `Subtotal ${v.length} patentes visibles` : `Total ${rows.length} patentes`}</td><td class="num">${fmt(s("base"))}</td><td class="num">${fmtPct(s("pct"))}</td><td class="num">${fmt(s("neto"))}</td><td class="num">${fmt(s("iva"))}</td><td class="num">${fmt(s("perc"))}</td><td class="num">${fmt(s("otros"))}</td><td class="num">${fmt(s("total"))}</td><td></td></tr>`;
+  $("tf").innerHTML = `<tr><td></td><td colspan="5">${v.length !== rows.length ? `Subtotal ${v.length} patentes visibles` : `Total ${rows.length} patentes`}</td><td class="num">${fmt(s("base"))}</td><td class="num">${fmtPct(s("pct"))}</td><td class="num">${fmt(s("neto"))}</td><td class="num">${fmt(s("iva"))}</td><td class="num">${fmt(s("perc"))}</td><td class="num">${fmt(s("otros"))}</td><td class="num">${fmt(s("total"))}</td></tr>`;
   document.querySelectorAll("#patview th[data-sort]").forEach(th => { th.classList.toggle("asc", th.dataset.sort === S.sort.k && S.sort.dir === 1); th.classList.toggle("desc", th.dataset.sort === S.sort.k && S.sort.dir === -1); });
   syncBulk();
 }
@@ -288,14 +315,15 @@ $("bulk-clear").addEventListener("click", async () => { const pats = [...S.sel];
 $("bulk-x").addEventListener("click", () => { S.sel.clear(); renderPat(); });
 document.querySelectorAll("#patview th[data-sort]").forEach(th => th.addEventListener("click", () => { const k = th.dataset.sort; S.sort = { k, dir: S.sort.k === k ? -S.sort.dir : 1 }; renderPat(); }));
 $("q").addEventListener("input", e => { S.q = e.target.value; renderPat(); });
-$("fil").addEventListener("change", e => { S.fil = e.target.value; renderPat(); });
+$("fil").addEventListener("change", e => { S.fil = e.target.value; S.sel.clear(); renderPat(); });
+$("fclear").addEventListener("click", () => { S.fil = "all"; S.zf = ""; S.q = ""; $("q").value = ""; S.sel.clear(); renderPat(); });
 $("zf").addEventListener("change", e => { S.zf = e.target.value; S.sel.clear(); renderPat(); });
 $("showoff").addEventListener("change", e => { S.showOff = e.target.checked; buildCC(); });
 $("t-cc").addEventListener("click", () => setView("cc"));
 $("t-pat").addEventListener("click", () => setView("pat"));
 function toggleCC(row) { const k = row.dataset.k; S.open.has(k) ? S.open.delete(k) : S.open.add(k); renderCC(); }
 $("ccb").addEventListener("click", e => {
-  if (e.target.closest("[data-go]")) { S.fil = "none"; $("fil").value = "none"; setView("pat"); renderPat(); return; }
+  if (e.target.closest("[data-go]")) { S.fil = "none"; S.zf = ""; S.sel.clear(); setView("pat"); renderPat(); return; }
   const row = e.target.closest(".ccrow"); if (row) toggleCC(row);
 });
 $("ccb").addEventListener("keydown", e => { const row = e.target.closest(".ccrow"); if (row && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggleCC(row); } });
@@ -544,7 +572,7 @@ function exportXlsx() {
   XLSX.utils.book_append_sheet(wb, ws1, "Totales por CC");
   XLSX.utils.book_append_sheet(wb, ws2, "Detalle por patente");
   XLSX.utils.book_append_sheet(wb, ws3, "Factura");
-  XLSX.writeFile(wb, `Seguros_por_CC_${p.id.replace(/[^\w-]/g, "")}.xlsx`);
+  XLSX.writeFile(wb, `Polizas_flota_vehicular_${p.id.replace(/[^\w-]/g, "")}.xlsx`);
 }
 $("exp").addEventListener("click", () => { const m = rows.filter(r => !r.cc).length; if (m) toast(`Exportando con ${m} patentes sin CC; figuran como «Sin CC».`); exportXlsx(); });
 
@@ -606,3 +634,13 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   start();
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && !$("app").hidden && $("upload").hidden) reload(); });
 }
+
+
+/* Encabezado fijo: la altura se usa para que los títulos de la tabla queden justo debajo */
+(() => {
+  const h = document.querySelector("header.top");
+  if (!h) return;
+  const setH = () => document.documentElement.style.setProperty("--hh", h.offsetHeight + "px");
+  setH();
+  if ("ResizeObserver" in window) new ResizeObserver(setH).observe(h); else addEventListener("resize", setH);
+})();
