@@ -101,7 +101,7 @@ async function loadPeriodo() {
   const data = await fetchAll(() => sb.from("seg_v_prorrateo").select("*").eq("periodo_id", p.id).order("certificado"));
   rows = data.map(r => ({
     cert: r.certificado, patente: r.patente, marca: r.marca, anio: r.anio || "", zona: r.zona || "",
-    valor: +r.valor, premio: +r.premio, base: p.metodo === "premio" ? +r.premio : +r.valor, pct: +r.porcentaje,
+    valor: +r.valor, premio: +r.premio, base: +r.premio, pct: +r.porcentaje,
     neto: +r.neto, iva: +r.iva, perc: +r.percepcion, otros: +r.otros_impuestos, total: +r.total,
     cc: r.cc || "", nuevo: r.nueva
   }));
@@ -153,15 +153,13 @@ function renderAll() {
   buildCC();
   const p = P();
   const sel = $("per");
-  sel.hidden = S.periodos.length < 2; $("newper").hidden = !p;
+  sel.hidden = S.periodos.length < 2; $("newper").hidden = !p; $("exp").hidden = !p; $("tabs").hidden = !p;
   sel.innerHTML = S.periodos.map(x => `<option value="${esc(x.id)}" ${x.id === S.actual ? "selected" : ""}>${esc(isoToAr(x.vigencia_desde))} al ${esc(isoToAr(x.vigencia_hasta))} · Fact. ${esc(x.id)}</option>`).join("");
   if (!p) { $("main").hidden = true; showUpload(true); $("hsub").textContent = "Cargá la póliza, la factura y la base de CC para ver cuánto le toca a cada centro de costo."; return; }
   if ($("upload").dataset.forced !== "1") $("upload").hidden = true;
   $("main").hidden = false;
   $("hsub").textContent = `Póliza ${p.poliza || ""} · ${p.tomador || ""} · Vigencia ${isoToAr(p.vigencia_desde)} al ${isoToAr(p.vigencia_hasta)} · ${rows.length} vehículos`;
   renderInvoice(p); renderProgress(); renderCC(); renderPat();
-  document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === p.metodo));
-  $("th-base").textContent = p.metodo === "premio" ? "Premio certificado" : "Valor del vehículo";
 }
 function renderInvoice(p) {
   $("i-num").textContent = "Factura " + p.id;
@@ -179,6 +177,9 @@ function renderProgress() {
   $("pg-txt").textContent = `${done} de ${rows.length}`;
   $("pg-bar").style.width = (rows.length ? done / rows.length * 100 : 0) + "%";
   $("t-cnt").hidden = !pend; $("t-cnt").textContent = pend + " pendientes";
+  $("pg-hint").textContent = !rows.length ? "" : pend ? `${pend} sin CC · ver cuáles` : "Todas con centro de costo";
+  $("asig").classList.toggle("pend", pend > 0);
+  $("asig").disabled = !pend;
 }
 function renderCC() {
   const g = groupByCC(); const T = rows.reduce((a, r) => a + r.total, 0);
@@ -327,11 +328,7 @@ $("ccb").addEventListener("click", e => {
   const row = e.target.closest(".ccrow"); if (row) toggleCC(row);
 });
 $("ccb").addEventListener("keydown", e => { const row = e.target.closest(".ccrow"); if (row && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggleCC(row); } });
-document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", async () => {
-  const p = P(); if (!p || p.metodo === b.dataset.m) return;
-  try { await rpc("seg_cambiar_metodo", { p_periodo: p.id, p_metodo: b.dataset.m }); p.metodo = b.dataset.m; await reload({ soloPeriodo: true }); }
-  catch (e) { toast("No se pudo cambiar la base del prorrateo: " + errMsg(e)); }
-}));
+$("asig").addEventListener("click", () => { S.fil = "none"; S.zf = ""; S.q = ""; $("q").value = ""; S.sel.clear(); setView("pat"); renderPat(); });
 $("per").addEventListener("change", async e => { S.actual = e.target.value; localStorage.setItem("seg-periodo", S.actual); S.sel.clear(); S.open.clear(); await reload({ soloPeriodo: true }); });
 
 /* ================= Excel: lectura ================= */
@@ -492,7 +489,7 @@ function renderChecks() {
     out.push(n && n !== v.length ? ["bad", `Encontré ${v.length} vehículos pero la póliza declara ${n} certificados.`] : ["", `${v.length} vehículos extraídos${n ? `, coincide con los ${n} certificados declarados` : ""}.`]);
     const seen = {}, dup = []; v.forEach(x => { if (seen[x.patente]) dup.push(x.patente); seen[x.patente] = 1; });
     if (dup.length) out.push(["warn", `Patentes repetidas: ${dup.join(", ")}.`]);
-    const sinVal = v.filter(x => !x.valor).length; if (sinVal) out.push(["warn", `${sinVal} vehículos sin valor; no recibirán importe si se prorratea por valor.`]);
+    const sinPrem = v.filter(x => !x.premio).length; if (sinPrem) out.push(["warn", `${sinPrem} vehículos sin premio; no recibirán importe en el prorrateo.`]);
     const sinPat = v.filter(x => !x.patente).length; if (sinPat) out.push(["bad", `${sinPat} certificados sin patente.`]);
   }
   if (fa) {
@@ -545,7 +542,7 @@ $("save").addEventListener("click", async () => {
 /* ================= Excel: exportación ================= */
 function exportXlsx() {
   const p = P();
-  const baseTxt = p.metodo === "premio" ? "Premio del certificado" : "Valor del vehículo";
+  const baseTxt = "Premio del certificado";
   const money = '#,##0.00';
   const g = groupByCC();
   const sh = [[`Factura ${p.id} del ${isoToAr(p.factura_fecha)} — Póliza ${p.poliza} (${p.tomador || ""}) — Vigencia ${isoToAr(p.vigencia_desde)} al ${isoToAr(p.vigencia_hasta)}`], [`Base de prorrateo: ${baseTxt}`], [], ["CC", "Descripción", "Zonas", "Patentes", "Neto", "IVA", "Percepción IVA", "Otros impuestos", "Total"]];
