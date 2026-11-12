@@ -45,6 +45,19 @@
       <button class="btn primary" id="exp" type="button" hidden>Exportar a Excel</button>
       <div class="user"><span id="uemail"></span><button class="linkbtn" type="button" id="logout">Salir</button></div>
     </div>
+  <section class="panel invoice" id="invoice" aria-label="Factura" hidden>
+    <div class="inv-id">
+      <div class="n" id="i-num"></div>
+      <dl id="i-dl"></dl>
+    </div>
+    <button class="asig" id="asig" type="button">
+      <span class="l">Asignadas</span>
+      <span class="v" id="pg-txt"></span>
+      <span class="bar"><i id="pg-bar"></i></span>
+      <span class="hint" id="pg-hint"></span>
+    </button>
+    <div class="amounts" id="i-amts"></div>
+  </section>
   </header>
 
   <!-- UPLOAD -->
@@ -72,19 +85,6 @@
 
   <!-- MAIN -->
   <div id="main" hidden>
-    <section class="panel invoice" aria-label="Factura">
-      <div class="inv-id">
-        <div class="n" id="i-num"></div>
-        <dl id="i-dl"></dl>
-      </div>
-      <button class="asig" id="asig" type="button">
-        <span class="l">Asignadas</span>
-        <span class="v" id="pg-txt"></span>
-        <span class="bar"><i id="pg-bar"></i></span>
-        <span class="hint" id="pg-hint"></span>
-      </button>
-      <div class="amounts" id="i-amts"></div>
-    </section>
 
     <section class="panel">
       <div id="ccview">
