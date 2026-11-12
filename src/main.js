@@ -17,7 +17,15 @@ async function loadPdfjs() {
 /* ================= Supabase ================= */
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
-const sb = SUPABASE_URL && SUPABASE_KEY ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+// El correo del usuario viaja en el encabezado x-usuario; la base solo
+// muestra datos y acepta cambios si ese correo está en seg_usuarios.
+let sb = null;
+function conectar(email) {
+  sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: email ? { "x-usuario": email } : {} }
+  });
+}
 
 async function fetchAll(build) {
   const out = [], size = 1000;
@@ -30,7 +38,10 @@ async function fetchAll(build) {
 }
 async function rpc(fn, args) {
   const { data, error } = await sb.rpc(fn, args);
-  if (error) throw error;
+  if (error) {
+    if (/Usuario no habilitado/.test(error.message || "")) salir("Tu correo ya no está habilitado.");
+    throw error;
+  }
   return data;
 }
 const errMsg = e => (e && (e.message || e.error_description)) || "Error desconocido";
@@ -154,7 +165,7 @@ function renderAll() {
 }
 function renderInvoice(p) {
   $("i-num").textContent = "Factura " + p.id;
-  $("i-dl").innerHTML = `<dt>Fecha</dt><dd>${esc(isoToAr(p.factura_fecha))}</dd><dt>Detalle</dt><dd>${esc(p.factura_detalle || "")}</dd><dt>Base de CC</dt><dd>${esc(S.bases.centros_costo?.archivo || "")}</dd>`;
+  $("i-dl").innerHTML = `<dt>Fecha</dt><dd>${esc(isoToAr(p.factura_fecha))}</dd><dt>Detalle</dt><dd>${esc(p.factura_detalle || "")}</dd><dt>Base de CC</dt><dd>${esc(S.bases.centros_costo?.archivo || "")}</dd>${p.creado_por ? `<dt>Cargado por</dt><dd>${esc(p.creado_por)}</dd>` : ""}`;
   const T = +p.neto + +p.iva + +p.percepcion + +p.otros_impuestos;
   const cuadra = Math.abs(rows.reduce((a, r) => a + r.total, 0) - T) < 0.005;
   $("i-amts").innerHTML = [
@@ -537,39 +548,61 @@ function exportXlsx() {
 }
 $("exp").addEventListener("click", () => { const m = rows.filter(r => !r.cc).length; if (m) toast(`Exportando con ${m} patentes sin CC; figuran como «Sin CC».`); exportXlsx(); });
 
-/* ================= Acceso ================= */
+/* ================= Ingreso ================= */
+const LS_USER = "seg-usuario";
 function screen(name) {
-  $("loading").hidden = name !== "loading"; $("login").hidden = name !== "login";
-  $("noacc").hidden = name !== "noacc"; $("app").hidden = name !== "app";
+  $("loading").hidden = name !== "loading"; $("login").hidden = name !== "login"; $("app").hidden = name !== "app";
+}
+function salir(msg) {
+  localStorage.removeItem(LS_USER);
+  conectar(null);
+  $("lemail").value = ""; $("lerr").textContent = msg || "";
+  screen("login"); $("lemail").focus();
+}
+async function validar(email) {
+  conectar(null);
+  const { data, error } = await sb.rpc("seg_ingresar", { p_email: email });
+  if (error) throw error;
+  return data; // {email, nombre} o null
+}
+async function entrar(u) {
+  localStorage.setItem(LS_USER, JSON.stringify(u));
+  conectar(u.email);
+  $("uemail").textContent = u.nombre ? `${u.nombre} (${u.email})` : u.email;
+  screen("loading");
+  try {
+    await loadMaestros(); await loadPeriodo();
+    screen("app"); renderAll();
+  } catch (e) { $("loading").textContent = "No se pudo conectar con la base de datos: " + errMsg(e); }
 }
 $("loginf").addEventListener("submit", async e => {
   e.preventDefault();
-  const btn = $("lbtn"); $("lerr").textContent = ""; busy(btn, true, "Ingresando…");
-  const { error } = await sb.auth.signInWithPassword({ email: $("lemail").value.trim(), password: $("lpass").value });
+  const email = $("lemail").value.trim().toLowerCase(), btn = $("lbtn");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { $("lerr").textContent = "Escribí un correo válido."; return; }
+  $("lerr").textContent = ""; busy(btn, true, "Ingresando…");
+  try {
+    const u = await validar(email);
+    if (u) await entrar(u);
+    else $("lerr").textContent = "Ese correo no está habilitado. Pedí que lo agreguen a la lista de usuarios.";
+  } catch (err) { $("lerr").textContent = "No se pudo conectar con la base de datos: " + errMsg(err); }
   busy(btn, false, "Ingresar");
-  if (error) $("lerr").textContent = error.message === "Invalid login credentials" ? "Email o contraseña incorrectos." : errMsg(error);
 });
-async function logout() { await sb.auth.signOut(); }
-$("logout").addEventListener("click", logout);
-$("noacc-out").addEventListener("click", logout);
+$("logout").addEventListener("click", () => salir());
 
-let started = null;
-async function start(session) {
-  if (!session) { started = null; screen("login"); return; }
-  if (started === session.user.id) return;
-  started = session.user.id;
+/* ================= Inicio ================= */
+async function start() {
+  let guardado = null;
+  try { guardado = JSON.parse(localStorage.getItem(LS_USER) || "null"); } catch (e) { }
+  if (!guardado?.email) return salir();
   screen("loading");
   try {
-    const ok = await rpc("seg_es_usuario");
-    if (!ok) { $("noacc-t").textContent = `Tu usuario (${session.user.email}) no está habilitado. Pedí que lo agreguen a la tabla seg_usuarios.`; screen("noacc"); return; }
-    $("uemail").textContent = session.user.email;
-    await loadMaestros(); await loadPeriodo();
-    screen("app"); renderAll();
-  } catch (e) { $("noacc-t").textContent = "No se pudo conectar con la base de datos: " + errMsg(e); screen("noacc"); }
+    const u = await validar(guardado.email);
+    if (u) await entrar(u); else salir("Tu correo ya no está habilitado.");
+  } catch (e) { $("loading").textContent = "No se pudo conectar con la base de datos: " + errMsg(e); }
 }
-if (!sb) {
+if (!SUPABASE_URL || !SUPABASE_KEY) {
   $("loading").textContent = "Falta configurar VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY.";
 } else {
-  sb.auth.onAuthStateChange((_ev, session) => { setTimeout(() => start(session), 0); });
+  start();
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && !$("app").hidden && $("upload").hidden) reload(); });
 }
