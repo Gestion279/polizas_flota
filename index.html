@@ -34,10 +34,15 @@
     <div>
       <h1 class="brand"><img src="/icon.svg" alt="" width="44" height="44">Pólizas flota vehicular</h1>
       <p class="sub" id="hsub">Cargá la póliza, la factura y la base de CC para ver cuánto le toca a cada centro de costo.</p>
+      <div class="tabs" role="tablist" id="tabs" hidden>
+        <button role="tab" id="t-cc" aria-selected="true" type="button">Totales por CC</button>
+        <button role="tab" id="t-pat" aria-selected="false" type="button">Patentes y asignación <span class="cnt" id="t-cnt" hidden></span></button>
+      </div>
     </div>
     <div class="hright">
       <select class="txt" id="per" aria-label="Período" hidden></select>
       <button class="btn" id="newper" type="button" hidden>Cargar nuevo período</button>
+      <button class="btn primary" id="exp" type="button" hidden>Exportar a Excel</button>
       <div class="sync user"><span id="uemail"></span><button class="linkbtn" type="button" id="logout">Salir</button></div>
       
     </div>
@@ -73,26 +78,16 @@
         <div class="n" id="i-num"></div>
         <dl id="i-dl"></dl>
       </div>
+      <button class="asig" id="asig" type="button">
+        <span class="l">Asignadas</span>
+        <span class="v" id="pg-txt"></span>
+        <span class="bar"><i id="pg-bar"></i></span>
+        <span class="hint" id="pg-hint"></span>
+      </button>
       <div class="amounts" id="i-amts"></div>
     </section>
 
     <section class="panel">
-      <div class="bar-top">
-        <div class="tabs" role="tablist">
-          <button role="tab" id="t-cc" aria-selected="true" type="button">Totales por CC</button>
-          <button role="tab" id="t-pat" aria-selected="false" type="button">Patentes y asignación <span class="cnt" id="t-cnt" hidden></span></button>
-        </div>
-        <div class="ctl">
-          <div class="progress"><span>Asignadas</span><div class="bar"><i id="pg-bar"></i></div><b id="pg-txt"></b></div>
-          <span class="lbl">Prorratear por</span>
-          <div class="seg" role="group" aria-label="Base del prorrateo">
-            <button type="button" data-m="valor" aria-pressed="true">Valor del vehículo</button>
-            <button type="button" data-m="premio" aria-pressed="false">Premio del certificado</button>
-          </div>
-          <button class="btn primary" id="exp" type="button">Exportar a Excel</button>
-        </div>
-      </div>
-
       <div id="ccview">
         <div class="tablewrap"><table>
           <thead><tr><th>Centro de costo</th><th>Descripción</th><th>Participación</th><th class="num">Patentes</th><th class="num">Neto</th><th class="num">IVA</th><th class="num">Perc. IVA</th><th class="num">Otros imp.</th><th class="num">Total</th></tr></thead>
@@ -125,7 +120,7 @@
           <thead><tr>
             <th style="width:34px"><input type="checkbox" id="all" aria-label="Seleccionar visibles"></th>
             <th data-sort="cert">Cert.</th><th data-sort="patente">Patente</th><th data-sort="marca">Marca completa</th><th data-sort="zona">Zona</th><th data-sort="cc">Centro de costo</th>
-            <th class="num" data-sort="base" id="th-base">Valor del vehículo</th><th class="num" data-sort="pct">%</th>
+            <th class="num" data-sort="base" id="th-base">Premio certificado</th><th class="num" data-sort="pct">%</th>
             <th class="num" data-sort="neto">Neto</th><th class="num" data-sort="iva">IVA</th><th class="num" data-sort="perc">Perc. IVA</th>
             <th class="num" data-sort="otros">Otros imp.</th><th class="num" data-sort="total">Total</th>
           </tr></thead>

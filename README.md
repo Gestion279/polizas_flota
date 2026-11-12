@@ -14,7 +14,7 @@ Cada semestre se suben la póliza (PDF), la factura (PDF) y, si cambiaron, la ba
 
 ### 1. Supabase
 
-1. En el proyecto, abrí **SQL Editor**, pegá el contenido completo de `supabase/migrations/20261112120000_seguros_cc.sql` y ejecutalo. Crea las tablas, las vistas y las funciones. Se puede ejecutar más de una vez sin perder datos. Si usás la CLI, alcanza con `supabase db push`.
+1. En el proyecto, abrí **SQL Editor**, pegá el contenido completo de `supabase/migrations/20261112120000_seguros_cc.sql` y ejecutalo. Crea las tablas, las vistas y las funciones. Después ejecutá `supabase/migrations/20261112150000_prorrateo_solo_premio.sql`, que fija el prorrateo por premio. Los dos se pueden ejecutar más de una vez sin perder datos. Si usás la CLI, alcanza con `supabase db push`.
 2. Ejecutá `supabase/usuarios.sql` para cargar los correos habilitados.
    - Para agregar a alguien, sumá una línea en ese archivo y volvé a ejecutarlo.
    - Para dar de baja a alguien: `update public.seg_usuarios set activo = false where email = 'correo@fabricasrl.com.ar';`
