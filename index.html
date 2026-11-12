@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Seguros automotor por centro de costo</title>
+<title>Pólizas flota vehicular</title>
 <link rel="icon" href="/favicon.ico" sizes="48x48">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -18,7 +18,7 @@
   <!-- INGRESO -->
   <section class="panel login" id="login" hidden>
     <img class="login-icon" src="/icon.svg" alt="" width="72" height="72">
-    <h1>Seguros automotor por centro de costo</h1>
+    <h1>Pólizas flota vehicular</h1>
     <p>Ingresá con tu correo de la empresa.</p>
     <form id="loginf" novalidate>
       <label for="lemail">Correo</label>
@@ -32,7 +32,7 @@
   <div id="app" hidden>
   <header class="top">
     <div>
-      <h1 class="brand"><img src="/icon.svg" alt="" width="44" height="44">Seguros automotor por centro de costo</h1>
+      <h1 class="brand"><img src="/icon.svg" alt="" width="44" height="44">Pólizas flota vehicular</h1>
       <p class="sub" id="hsub">Cargá la póliza, la factura y la base de CC para ver cuánto le toca a cada centro de costo.</p>
     </div>
     <div class="hright">
@@ -104,14 +104,9 @@
       <div id="patview" hidden>
         <div class="toolbar">
           <input class="txt" id="q" type="search" placeholder="Buscar patente, marca o CC" style="min-width:220px">
-          <select class="txt" id="fil" aria-label="Filtro" style="max-width:240px">
-            <option value="all">Todas las patentes</option>
-            <option value="none">Sin centro de costo</option>
-            <option value="done">Con centro de costo</option>
-            <option value="bad">Con CC inválido o inhabilitado</option>
-            <option value="new">Nuevas en este período</option>
-          </select>
-          <select class="txt" id="zf" aria-label="Zona" style="max-width:220px"><option value="">Todas las zonas</option></select>
+          <select class="txt" id="fil" aria-label="Filtro por centro de costo" style="max-width:270px"></select>
+          <select class="txt" id="zf" aria-label="Zona" style="max-width:250px"><option value="">Todas las zonas</option></select>
+          <button class="btn" id="fclear" type="button" hidden>Limpiar filtros</button>
           <label style="font-size:13px;display:flex;gap:6px;align-items:center;color:var(--muted)"><input type="checkbox" id="showoff"> Ofrecer CC inhabilitados</label>
           <span style="flex:1"></span>
           <button class="btn" id="impz" type="button">Actualizar zonas</button>
@@ -129,10 +124,10 @@
         <div class="tablewrap"><table>
           <thead><tr>
             <th style="width:34px"><input type="checkbox" id="all" aria-label="Seleccionar visibles"></th>
-            <th data-sort="cert">Cert.</th><th data-sort="patente">Patente</th><th data-sort="marca">Marca completa</th><th data-sort="zona">Zona</th>
+            <th data-sort="cert">Cert.</th><th data-sort="patente">Patente</th><th data-sort="marca">Marca completa</th><th data-sort="zona">Zona</th><th data-sort="cc">Centro de costo</th>
             <th class="num" data-sort="base" id="th-base">Valor del vehículo</th><th class="num" data-sort="pct">%</th>
             <th class="num" data-sort="neto">Neto</th><th class="num" data-sort="iva">IVA</th><th class="num" data-sort="perc">Perc. IVA</th>
-            <th class="num" data-sort="otros">Otros imp.</th><th class="num" data-sort="total">Total</th><th data-sort="cc">Centro de costo</th>
+            <th class="num" data-sort="otros">Otros imp.</th><th class="num" data-sort="total">Total</th>
           </tr></thead>
           <tbody id="tb"></tbody>
           <tfoot id="tf"></tfoot>

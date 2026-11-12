@@ -1,4 +1,4 @@
-# Seguros automotor por centro de costo
+# Pólizas flota vehicular
 
 Aplicación web para prorratear la factura semestral de la póliza de flota de La Segunda entre las patentes y ver el monto total por centro de costo (CC).
 
