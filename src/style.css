@@ -70,7 +70,8 @@ input.txt:focus,select.txt:focus{outline:2px solid color-mix(in srgb,var(--merco
 .uactions .note{font-size:13px;color:var(--muted)}
 
 /* Invoice strip */
-.invoice{display:grid;grid-template-columns:minmax(230px,1.1fr) minmax(150px,.55fr) 3fr;margin-bottom:16px}
+.invoice{display:grid;grid-template-columns:minmax(230px,1.1fr) minmax(150px,.55fr) 3fr;margin:0}
+header.top .invoice{flex:1 1 100%;order:9}
 .inv-id{padding:16px 18px;border-right:1px solid var(--line)}
 .inv-id .n{font:700 20px var(--cond)}
 .inv-id dl{margin:8px 0 0;display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:13px}
@@ -223,17 +224,19 @@ select.txt:disabled{opacity:.6}
 
 /* Encabezado: en una sola fila cuando hay lugar */
 @media (min-width:1200px){
-  header.top{flex-wrap:nowrap}
-  header.top>div:first-child{flex:1 1 auto;min-width:0}
-  .hright{flex:0 1 auto;justify-content:flex-end;max-width:62%}
-  #per{min-width:0;max-width:340px}
+  header.top{flex-wrap:wrap;row-gap:12px}
+  header.top>div:first-child{flex:1 1 0;min-width:440px}
+  header.top .tabs{flex-wrap:nowrap}
+  .hright{flex:1 1 0;min-width:0;justify-content:flex-end}
+  #per{flex:0 1 200px;max-width:340px;min-width:150px}
+  #newper,#exp{flex:none}
   #patview .tablewrap{overflow:visible}
   #patview table{min-width:0}
   #patview thead th{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--hvis) + var(--bh,0px));z-index:5;box-shadow:inset 0 -1px 0 var(--line)}
 }
 
 /* Notebook: la factura pasa a dos filas y la tabla se compacta para entrar sin desplazamiento */
-@media (max-width:1439px){
+@media (max-width:1199px){
   .invoice{grid-template-columns:minmax(0,1fr) minmax(180px,250px)}
   .asig{border-right:0}
   .amounts{grid-column:1/-1;border-top:1px solid var(--line)}
@@ -255,7 +258,8 @@ select.txt:disabled{opacity:.6}
   header.top .brand{order:1;width:100%}
   header.top .sub{order:2;width:100%;margin-top:-6px}
   .hright{order:3;width:100%}
-  header.top .tabs{order:4;width:100%;margin-top:0}
+  header.top .invoice{order:4}
+  header.top .tabs{order:5;width:100%;margin-top:0}
   #per{flex:1 1 280px;min-width:0}
   .user{width:auto;margin-left:auto}
 }
@@ -398,3 +402,26 @@ select.txt:disabled{opacity:.6}
   .t-fine{display:none} .t-touch{display:inline}
 }
 @media (max-width:760px){input.txt,select.txt,.cc input{font-size:16px}}
+
+/* Escritorio: las siete tarjetas de la factura en una sola fila, dentro del encabezado fijo */
+@media (min-width:1200px){
+  .invoice{grid-template-columns:minmax(190px,1.5fr) minmax(130px,1fr) repeat(4,minmax(0,1fr)) minmax(0,1.2fr)}
+  .invoice .amounts{display:contents}
+  .inv-id,.asig,.amt{padding:10px 14px;min-width:0}
+  .asig{border-right:1px solid var(--line)}
+  .inv-id .n{font-size:18px;line-height:1.15}
+  .inv-id dl{margin-top:4px;font-size:12.5px;gap:1px 8px}
+  .inv-id dd{min-width:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .asig .v{font-size:20px}
+  .amt .v{font-size:17px}
+  .amt.total .v{font-size:19px}
+  .amt .hint,.asig .hint{line-height:1.3}
+}
+@media (min-width:1200px) and (max-width:1439px){
+  .inv-id,.asig,.amt{padding:10px 11px}
+  .amt .v{font-size:16px} .amt.total .v{font-size:18px}
+  .inv-id .n{font-size:15.5px}
+  .invoice{grid-template-columns:minmax(178px,1.4fr) minmax(120px,1fr) repeat(4,minmax(0,1fr)) minmax(0,1.2fr)}
+  .amt .l,.asig .l{font-size:12px}
+  .amt .hint,.asig .hint{font-size:11px}
+}

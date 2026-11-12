@@ -155,9 +155,9 @@ function renderAll() {
   const sel = $("per");
   sel.hidden = S.periodos.length < 2; $("newper").hidden = !p; $("exp").hidden = !p; $("tabs").hidden = !p;
   sel.innerHTML = S.periodos.map(x => `<option value="${esc(x.id)}" ${x.id === S.actual ? "selected" : ""}>${esc(isoToAr(x.vigencia_desde))} al ${esc(isoToAr(x.vigencia_hasta))} · Fact. ${esc(x.id)}</option>`).join("");
-  if (!p) { $("main").hidden = true; showUpload(true); $("hsub").textContent = "Cargá la póliza, la factura y la base de CC para ver cuánto le toca a cada centro de costo."; return; }
+  if (!p) { $("main").hidden = true; $("invoice").hidden = true; showUpload(true); $("hsub").textContent = "Cargá la póliza, la factura y la base de CC para ver cuánto le toca a cada centro de costo."; return; }
   if ($("upload").dataset.forced !== "1") $("upload").hidden = true;
-  $("main").hidden = false;
+  $("main").hidden = false; $("invoice").hidden = false;
   $("hsub").textContent = `Póliza ${p.poliza || ""} · ${p.tomador || ""} · Vigencia ${isoToAr(p.vigencia_desde)} al ${isoToAr(p.vigencia_hasta)} · ${rows.length} vehículos`;
   renderInvoice(p); renderProgress(); renderCC(); renderPat();
 }
