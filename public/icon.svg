@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <mask id="cut" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="#fff"/>
+      <path d="M360 186c40 26 82 36 116 38v104c0 76-50 128-116 158-66-30-116-82-116-158V224c34-2 76-12 116-38z" fill="#000" stroke="#000" stroke-width="44" stroke-linejoin="round"/>
+    </mask>
+    <clipPath id="clip"><path d="M360 186c40 26 82 36 116 38v104c0 76-50 128-116 158-66-30-116-82-116-158V224c34-2 76-12 116-38z"/></clipPath>
+  </defs>
+  <g mask="url(#cut)" fill="none" stroke="#0A4088" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M98 236l32-92c6-18 20-28 40-28h168c20 0 34 10 40 28l32 92"/>
+    <path d="M62 362v-84c0-24 18-42 42-42h304c24 0 42 18 42 42v84z"/>
+    <path d="M88 362v34h50v-34M374 362v34h50v-34"/>
+    <path d="M40 224h32M440 224h32"/>
+    <rect x="96" y="276" width="68" height="34" rx="14"/>
+    <rect x="348" y="276" width="68" height="34" rx="14"/>
+    <path d="M206 290h100M206 324h100"/>
+  </g>
+  <g clip-path="url(#clip)">
+    <rect x="230" y="170" width="260" height="330" fill="#0A4088"/>
+    <path d="M230 170h150L230 320z" fill="#BA1212"/>
+    <path d="M396 170L230 336" stroke="#fff" stroke-width="12"/>
+  </g>
+  <path d="M308 340l36 36 70-78" fill="none" stroke="#fff" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
