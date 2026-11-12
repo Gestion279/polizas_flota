@@ -23,7 +23,7 @@
 }
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 *,*::before,*::after{box-sizing:inherit}
-html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + var(--hvis,0px) + 12px)}
 body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.45 var(--sans);font-variant-numeric:tabular-nums}
 [hidden]{display:none!important}
 .wrap{max-width:1680px;margin:0 auto;padding:0 16px 60px}
@@ -32,7 +32,6 @@ h2{font:700 19px/1.2 var(--cond);margin:0}
 .sub{color:var(--muted);margin:0}
 header.top{display:flex;flex-wrap:wrap;gap:10px 28px;align-items:flex-end;justify-content:space-between;margin:0 -16px 16px;padding:14px 16px 12px;position:sticky;top:env(safe-area-inset-top,0px);z-index:15;background:var(--paper);border-bottom:1px solid var(--line);box-shadow:0 4px 10px -8px rgba(0,0,0,.25)}
 .hright{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.sync{font-size:12px;color:var(--muted);width:100%;text-align:right}
 
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px}
 .btn{font:600 13.5px var(--sans);border-radius:7px;padding:8px 14px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
@@ -40,7 +39,8 @@ header.top{display:flex;flex-wrap:wrap;gap:10px 28px;align-items:flex-end;justif
 .btn.primary{background:var(--mercosur);border-color:var(--mercosur);color:#fff}
 .btn.primary:hover{filter:brightness(1.08)}
 .btn:disabled{opacity:.5;cursor:not-allowed;filter:none}
-.btn:focus-visible,.seg button:focus-visible,.tabs button:focus-visible{outline:2px solid var(--mercosur);outline-offset:2px}
+.btn:focus-visible,.tabs button:focus-visible,.linkbtn:focus-visible{outline:2px solid var(--mercosur);outline-offset:2px}
+th[data-sort]:focus-visible,.ccrow:focus-visible{outline:2px solid var(--mercosur);outline-offset:-2px}
 input.txt,select.txt{font:14px var(--sans);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:7px 10px}
 input.txt:focus,select.txt:focus{outline:2px solid color-mix(in srgb,var(--mercosur) 45%,transparent);border-color:var(--mercosur)}
 
@@ -88,15 +88,6 @@ header.top .tabs{margin-top:10px}
 .tabs button{border:0;background:transparent;color:var(--muted);font:600 16px var(--cond);padding:8px 12px;border-radius:7px;cursor:pointer}
 .tabs button[aria-selected="true"]{color:var(--ink);background:var(--surface);box-shadow:inset 0 -2px 0 var(--mercosur)}
 .tabs .cnt{font:600 12px var(--sans);background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:1px 7px;margin-left:5px;vertical-align:2px}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
-.seg button{border:0;background:transparent;color:var(--muted);padding:7px 12px;font:500 13px var(--sans);cursor:pointer}
-.seg button[aria-pressed="true"]{background:var(--mercosur);color:#fff}
-.ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.ctl .lbl{font-size:13px;color:var(--muted)}
-.progress{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
-.progress .bar{width:140px;height:7px;background:var(--barbg);border-radius:4px;overflow:hidden}
-.progress .bar i{display:block;height:100%;background:var(--ok);width:0;transition:width .3s}
-.progress b{color:var(--ink);font:600 14px var(--cond)}
 
 .tablewrap{overflow-x:auto}
 table{border-collapse:collapse;width:100%}
@@ -122,13 +113,13 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 td.big{font:700 16px var(--cond)}
 .detail td{background:var(--paper);padding:10px 14px 14px 34px}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
-.chip{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:4px 9px 4px 4px;font-size:12.5px}
+.chip{display:inline-flex;flex-wrap:wrap;max-width:100%;align-items:center;gap:6px 8px;background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:4px 9px 4px 4px;font-size:12.5px}
 .chip em{font-style:normal;color:var(--muted)}
 .chip b{font-weight:600}
 
 /* Patentes */
 #patview .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
-#patview table{min-width:0;font-size:13px}
+#patview table{font-size:13px}
 #patview th,#patview td{padding:7px 6px}
 #patview th{white-space:normal;line-height:1.2}
 #patview th[data-sort]{cursor:pointer;user-select:none}
@@ -162,17 +153,10 @@ td.tot{font-weight:600}
 .cc.bad input{border-color:var(--bad);background:var(--bad-bg)}
 .cc.bad small{color:var(--bad)} .cc.off small{color:var(--warn)}
 .empty{padding:28px;text-align:center;color:var(--muted)}
-.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:8px;font-size:13.5px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20;max-width:90vw}
+.toast{position:fixed;left:50%;bottom:calc(20px + var(--bfix,0px) + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:8px;font-size:13.5px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20;max-width:90vw}
 .toast.on{opacity:1}
 input[type=checkbox]{width:16px;height:16px;accent-color:var(--mercosur)}
-@media (max-width:1100px){.slots{grid-template-columns:repeat(2,1fr)}}
-@media (max-width:900px){
-  .invoice{grid-template-columns:1fr} .inv-id{border-right:0;border-bottom:1px solid var(--line)}
-  .asig{border-right:0;border-bottom:1px solid var(--line)}
-  .amounts{grid-template-columns:repeat(2,1fr)} .amt{border-bottom:1px solid var(--line)}
-  .slots{grid-template-columns:1fr}
-}
-@media (prefers-reduced-motion:reduce){.progress .bar i,.toast,.drop,.ccrow td.code::before{transition:none}}
+@media (prefers-reduced-motion:reduce){.toast,.drop,.ccrow td.code::before{transition:none}}
 
 /* Ingreso */
 .login{max-width:380px;margin:12vh auto 0;padding:28px}
@@ -183,7 +167,7 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--mercosur)}
 .login .btn{width:100%;margin-top:18px;padding:10px}
 .login .err{color:var(--bad);font-size:13px;margin-top:12px;min-height:1em}
 .login-icon{display:block;background:#fff;border-radius:14px;padding:5px;margin-bottom:14px;border:1px solid var(--line)}
-.user{font-size:13px;color:var(--muted);display:flex;gap:10px;align-items:center}
+.user{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;justify-content:flex-end;width:100%}
 .linkbtn{background:none;border:0;color:var(--mercosur);font:600 13px var(--sans);cursor:pointer;padding:0}
 .linkbtn:hover{text-decoration:underline}
 .btn.busy{opacity:.7;cursor:progress}
@@ -193,17 +177,7 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--mercosur)}
 .brand{display:flex;align-items:center;gap:12px}
 .brand img{flex:none;background:#fff;border-radius:10px;padding:3px}
 
-/* Tabla de patentes: en pantallas anchas entra completa y sus títulos quedan fijos debajo del encabezado */
-@media (min-width:1024px){
-  #patview .tablewrap{overflow:visible}
-  #patview thead th{position:sticky;top:calc(var(--hh,0px) + env(safe-area-inset-top,0px));z-index:5;box-shadow:inset 0 -1px 0 var(--line)}
-}
-@media (max-width:1023px){#patview table{min-width:1100px}}
 select.txt:disabled{opacity:.6}
-@media (max-width:700px){
-  header.top{position:static;box-shadow:none}
-  h1.brand,.brand{font-size:22px}
-}
 
 /* Tarjeta de asignación */
 .asig{all:unset;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;gap:3px;padding:14px 16px;border-right:1px solid var(--line);background:var(--ok-bg)}
@@ -219,3 +193,208 @@ select.txt:disabled{opacity:.6}
 .asig.pend:hover{filter:brightness(.97)}
 .asig:focus-visible{outline:2px solid var(--mercosur);outline-offset:-2px}
 @media (prefers-reduced-motion:reduce){.asig .bar i{transition:none}}
+
+/* ==========================================================================
+   Adaptación a pantallas
+   ≥1440  escritorio amplio: todo en una fila
+   1200–1439  notebook: factura en dos filas, tabla compacta que entra completa
+   761–1199  tablet: tablas con desplazamiento lateral y patente fija a la izquierda
+   ≤760  celular: tablas convertidas en tarjetas, barra de selección abajo
+   ========================================================================== */
+:root{--hvis:var(--hh,0px)}
+.only-m,.t-touch{display:none}
+
+/* Filtros y barra de selección */
+.toolbar .fq{flex:1 1 220px;min-width:0;max-width:340px}
+.toolbar .fsel{flex:0 1 auto;min-width:0;max-width:270px}
+.offchk{font-size:13px;display:flex;gap:6px;align-items:center;color:var(--muted);cursor:pointer}
+.grow{flex:1}
+.bulk-cc{flex:1 1 200px;max-width:360px;min-width:0}
+.bulk.on{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--hvis));z-index:6;box-shadow:0 6px 10px -8px rgba(0,0,0,.3)}
+.selall{display:flex;align-items:center;gap:8px;cursor:pointer}
+#patview .th-chk,#patview td.chk{width:36px;min-width:36px;max-width:36px}
+
+/* Filas con fondo propio para que las columnas fijas no dejen ver lo que pasa por debajo */
+#patview tbody tr,#ccview tbody tr:not(.detail),#patview tfoot tr,#ccview tfoot tr{background:var(--surface)}
+#patview tbody tr:hover,#ccview tbody tr.ccrow:hover{background:var(--row-hover)}
+#patview tbody tr.sel{background:var(--sel)}
+#ccview tbody tr.ccrow.none{background:var(--warn-bg)}
+#ccview tbody tr.ccrow.bad{background:var(--bad-bg)}
+
+/* Encabezado: en una sola fila cuando hay lugar */
+@media (min-width:1200px){
+  header.top{flex-wrap:nowrap}
+  header.top>div:first-child{flex:1 1 auto;min-width:0}
+  .hright{flex:0 1 auto;justify-content:flex-end;max-width:62%}
+  #per{min-width:0;max-width:340px}
+  #patview .tablewrap{overflow:visible}
+  #patview table{min-width:0}
+  #patview thead th{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--hvis) + var(--bh,0px));z-index:5;box-shadow:inset 0 -1px 0 var(--line)}
+}
+
+/* Notebook: la factura pasa a dos filas y la tabla se compacta para entrar sin desplazamiento */
+@media (max-width:1439px){
+  .invoice{grid-template-columns:minmax(0,1fr) minmax(180px,250px)}
+  .asig{border-right:0}
+  .amounts{grid-column:1/-1;border-top:1px solid var(--line)}
+}
+@media (min-width:1200px) and (max-width:1439px){
+  #patview table{font-size:12.5px}
+  #patview th,#patview td{padding:7px 5px}
+  #patview .plate{width:76px} #patview .plate span{font-size:12.5px}
+  td.marca{min-width:120px}
+  .cc{min-width:140px} .cc small{max-width:150px}
+  .zona{font-size:12px;padding:2px 5px}
+}
+
+/* Tablet y celular: el encabezado sube al desplazarse y quedan fijas solo las pestañas */
+@media (max-width:1199px){
+  :root{--hvis:calc(var(--hh,0px) - var(--hpin,0px))}
+  header.top{top:calc(env(safe-area-inset-top,0px) - var(--hpin,0px));align-items:stretch;gap:10px 16px}
+  header.top>div:first-child{display:contents}
+  header.top .brand{order:1;width:100%}
+  header.top .sub{order:2;width:100%;margin-top:-6px}
+  .hright{order:3;width:100%}
+  header.top .tabs{order:4;width:100%;margin-top:0}
+  #per{flex:1 1 280px;min-width:0}
+  .user{width:auto;margin-left:auto}
+}
+
+/* Tablet: desplazamiento lateral con selección y patente fijas */
+@media (min-width:761px) and (max-width:1199px){
+  #patview table{min-width:1100px}
+  #patview td.chk,#patview .th-chk{position:sticky;left:0;z-index:2;background:inherit}
+  #patview td.pat,#patview th[data-sort="patente"]{position:sticky;left:36px;z-index:2;background:inherit;box-shadow:1px 0 0 var(--line)}
+  #patview thead th,#patview thead th.th-chk,#patview thead th[data-sort="patente"]{background:var(--surface)}
+  #ccview td.code,#ccview thead th:first-child{position:sticky;left:0;z-index:2;background:inherit;box-shadow:1px 0 0 var(--line)}
+  #ccview thead th,#ccview thead th:first-child{background:var(--surface)}
+}
+
+@media (max-width:1100px){.slots{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:900px){
+  .invoice{grid-template-columns:1fr}
+  .inv-id{border-right:0;border-bottom:1px solid var(--line)}
+  .amounts{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .amt{border-bottom:1px solid var(--line)}
+  .amt:nth-child(2n){border-right:0}
+  .amt.total{grid-column:1/-1;border-bottom:0}
+}
+
+/* Celular */
+@media (max-width:760px){
+  .only-m{display:revert}
+  .wrap{padding:0 12px 40px}
+  header.top{margin:0 -12px 12px;padding:12px 12px 8px}
+  h1.brand,.brand{font-size:22px} .brand img{width:36px;height:36px}
+  header.top .sub{font-size:13px}
+  .hright{gap:8px}
+  #per{flex-basis:100%}
+  #newper,#exp{flex:1 1 0;white-space:nowrap;padding-left:8px;padding-right:8px}
+  .tabs{flex-wrap:nowrap}
+  .tabs button{flex:1 1 0;text-align:center;padding:8px 6px;white-space:nowrap}
+
+  .upload{padding:16px}
+  .drop{padding:18px 14px}
+  .uactions .btn{flex:1 1 100%}
+  .inv-id,.asig,.amt{padding:12px 14px}
+  .amt:not(.total) .hint{display:none}
+  .amt .v{font-size:17px}
+
+  /* Filtros */
+  #patview .toolbar{padding:12px;gap:8px}
+  .toolbar .fq,#sortsel{flex:1 1 100%;max-width:none}
+  .toolbar .fsel{flex:1 1 calc(50% - 4px);max-width:none}
+  .offchk{flex:1 1 100%}
+  .grow{display:none}
+  .toolbar .imp{flex:1 1 calc(50% - 4px);padding-left:8px;padding-right:8px}
+
+  /* Barra de selección fija abajo, al alcance del pulgar */
+  .bulk.on{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:16;gap:8px;padding:12px 12px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);border-bottom:0;box-shadow:0 -6px 16px -8px rgba(0,0,0,.35)}
+  .bulk b{order:1;flex:1 1 auto}
+  #bulk-x{order:2}
+  .bulk-cc{order:3;flex:1 1 100%;max-width:none}
+  #bulk-ok{order:4;flex:1 1 auto}
+  #bulk-clear{order:5}
+  body.bulk-on .wrap{padding-bottom:calc(var(--bfix,0px) + 24px)}
+
+  /* Tablas como tarjetas */
+  #patview .tablewrap,#ccview .tablewrap{overflow:visible}
+  #patview table,#ccview table,#patview tbody,#ccview tbody,#patview tfoot,#ccview tfoot{display:block;min-width:0}
+  #ccview thead{display:none}
+  #patview thead,#patview thead tr{display:block}
+  #patview thead th{display:none}
+  #patview thead th.th-chk{display:block;width:auto;max-width:none;position:static;padding:10px 14px;border-bottom:1px solid var(--line);font:600 13.5px var(--sans);color:var(--ink)}
+  #patview tbody td,#patview tfoot td,#ccview tbody td,#ccview tfoot td{display:block;padding:0;border:0;min-width:0;width:auto;max-width:none}
+  td.empty{padding:28px 14px!important}
+
+  #patview tbody tr[data-p]{display:grid;grid-template-columns:30px repeat(3,minmax(0,1fr));gap:6px 10px;padding:12px 14px;border-bottom:1px solid var(--line);
+    grid-template-areas:"chk pat pat tot" "chk marca marca marca" ". zn zn cert" ". ccc ccc ccc" ". base pct neto" ". iva perc otros"}
+  #patview tr[data-p]>td:nth-child(1){grid-area:chk;padding-top:6px}
+  #patview tr[data-p]>td:nth-child(2){grid-area:cert;text-align:right;font-size:12.5px;align-self:center}
+  #patview tr[data-p]>td:nth-child(2)::before{content:"Cert. "}
+  #patview tr[data-p]>td:nth-child(3){grid-area:pat}
+  #patview tr[data-p]>td:nth-child(4){grid-area:marca;font-size:14px}
+  #patview tr[data-p]>td:nth-child(5){grid-area:zn;align-self:center}
+  #patview tr[data-p]>td:nth-child(6){grid-area:ccc}
+  #patview tr[data-p]>td:nth-child(7){grid-area:base}
+  #patview tr[data-p]>td:nth-child(8){grid-area:pct}
+  #patview tr[data-p]>td:nth-child(9){grid-area:neto}
+  #patview tr[data-p]>td:nth-child(10){grid-area:iva}
+  #patview tr[data-p]>td:nth-child(11){grid-area:perc}
+  #patview tr[data-p]>td:nth-child(12){grid-area:otros}
+  #patview tr[data-p]>td:nth-child(13){grid-area:tot}
+  #patview .plate{width:96px} #patview .plate span{font-size:15px;letter-spacing:1px}
+  #patview td.num{text-align:left;font-size:13px;white-space:nowrap}
+  #patview td.num::before{content:attr(data-l);display:block;font:500 11.5px var(--sans);color:var(--muted)}
+  #patview td.tot{text-align:right;font:700 18px/1.1 var(--cond);align-self:center}
+  #patview td.tot::before{font-family:var(--sans)}
+  .cc{min-width:0} .cc small{max-width:none;white-space:normal}
+
+  #patview tfoot tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;padding:12px 14px;border-top:2px solid var(--ink);
+    grid-template-areas:"lbl lbl tot" "base pct neto" "iva perc otros"}
+  #patview tfoot td.chk{display:none}
+  #patview tfoot td:nth-child(2){grid-area:lbl;align-self:center}
+  #patview tfoot td:nth-child(3){grid-area:base}
+  #patview tfoot td:nth-child(4){grid-area:pct}
+  #patview tfoot td:nth-child(5){grid-area:neto}
+  #patview tfoot td:nth-child(6){grid-area:iva}
+  #patview tfoot td:nth-child(7){grid-area:perc}
+  #patview tfoot td:nth-child(8){grid-area:otros}
+  #patview tfoot td:nth-child(9){grid-area:tot}
+
+  #ccview tbody tr.ccrow,#ccview tfoot tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 16px;padding:12px 14px;border-bottom:1px solid var(--line);
+    grid-template-areas:"code tot" "desc desc" "sh n" "neto iva" "perc otros"}
+  #ccview tfoot tr{border-top:2px solid var(--ink);border-bottom:0}
+  #ccview td.code{grid-area:code;align-self:center}
+  #ccview td.desc{grid-area:desc;margin-bottom:4px}
+  #ccview td.sh{grid-area:sh;align-self:center}
+  #ccview td.n{grid-area:n}
+  #ccview tr>td:nth-child(5){grid-area:neto}
+  #ccview tr>td:nth-child(6){grid-area:iva}
+  #ccview tr>td:nth-child(7){grid-area:perc}
+  #ccview tr>td:nth-child(8){grid-area:otros}
+  #ccview td.big{grid-area:tot;text-align:right;font-size:19px;align-self:center}
+  #ccview td.num[data-l]{display:flex;justify-content:space-between;gap:8px;font-size:13px}
+  #ccview td.num[data-l]::before{content:attr(data-l);color:var(--muted);font-size:12.5px}
+  .share{min-width:0}
+  #ccview tr.detail{display:block}
+  #ccview tr.detail td{padding:10px 14px 14px;background:var(--paper)}
+  .detail .btn{width:100%}
+}
+@media (max-width:560px){
+  .slots{grid-template-columns:1fr}
+  .slot{min-height:0}
+  .t-long{display:none}
+  .login{margin-top:6vh;padding:22px}
+}
+
+/* Pantallas táctiles: áreas de toque de 44 px y campos de 16 px para que iOS no haga zoom */
+@media (pointer:coarse){
+  .btn,input.txt,select.txt,.tabs button{min-height:44px}
+  .cc input{min-height:40px}
+  input.txt,select.txt,.cc input{font-size:16px}
+  input[type=checkbox]{width:22px;height:22px}
+  .linkbtn{padding:10px 4px;margin:-10px -4px}
+  .t-fine{display:none} .t-touch{display:inline}
+}
+@media (max-width:760px){input.txt,select.txt,.cc input{font-size:16px}}

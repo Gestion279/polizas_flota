@@ -176,7 +176,7 @@ function renderProgress() {
   const done = rows.filter(r => r.cc && ccMap.has(r.cc)).length, pend = rows.length - done;
   $("pg-txt").textContent = `${done} de ${rows.length}`;
   $("pg-bar").style.width = (rows.length ? done / rows.length * 100 : 0) + "%";
-  $("t-cnt").hidden = !pend; $("t-cnt").textContent = pend + " pendientes";
+  $("t-cnt").hidden = !pend; $("t-cnt").innerHTML = `${pend}<span class="t-long"> pendientes</span>`; $("t-cnt").title = pend + " patentes sin centro de costo";
   $("pg-hint").textContent = !rows.length ? "" : pend ? `${pend} sin CC · ver cuáles` : "Todas con centro de costo";
   $("asig").classList.toggle("pend", pend > 0);
   $("asig").disabled = !pend;
@@ -191,9 +191,9 @@ function renderCC() {
     const zs = x.cc ? [...new Set(x.pats.map(r => r.zona).filter(Boolean))] : [];
     const open = S.open.has(key);
     let html = `<tr class="ccrow ${cls} ${open ? "open" : ""}" data-k="${esc(key)}" tabindex="0" aria-expanded="${open}">
-      <td class="code">${x.cc ? esc(x.cc) : "Sin CC"}</td><td>${esc(desc)}${zs.length ? `<small class="zl">${esc(zs.join(", "))}</small>` : ""}</td>
-      <td><div class="share"><div class="b"><i style="width:${(x.total / max * 100).toFixed(1)}%"></i></div><span>${fmtPct(T ? x.total / T : 0)}</span></div></td>
-      <td class="num">${x.n}</td><td class="num">${fmt(x.neto)}</td><td class="num">${fmt(x.iva)}</td><td class="num">${fmt(x.perc)}</td><td class="num">${fmt(x.otros)}</td><td class="num big">$ ${fmt(x.total)}</td></tr>`;
+      <td class="code">${x.cc ? esc(x.cc) : "Sin CC"}</td><td class="desc">${esc(desc)}${zs.length ? `<small class="zl">${esc(zs.join(", "))}</small>` : ""}</td>
+      <td class="sh"><div class="share"><div class="b"><i style="width:${(x.total / max * 100).toFixed(1)}%"></i></div><span>${fmtPct(T ? x.total / T : 0)}</span></div></td>
+      <td class="num n" data-l="Patentes">${x.n}</td><td class="num" data-l="Neto">${fmt(x.neto)}</td><td class="num" data-l="IVA">${fmt(x.iva)}</td><td class="num" data-l="Perc. IVA">${fmt(x.perc)}</td><td class="num" data-l="Otros imp.">${fmt(x.otros)}</td><td class="num big">$ ${fmt(x.total)}</td></tr>`;
     if (open) {
       html += `<tr class="detail"><td colspan="9"><div class="chips">${x.pats.slice().sort((a, b) => b.total - a.total).map(r => `<span class="chip"><span class="plate sm"><span>${esc(r.patente)}</span></span><em>${esc(r.marca)}</em>${r.zona ? `<span class="zona">${esc(r.zona)}</span>` : ""}<b>$ ${fmt(r.total)}</b></span>`).join("")}</div>
       ${x.cc === "" ? `<div style="margin-top:10px"><button class="btn primary" type="button" data-go="none">Asignar CC a estas patentes</button></div>` : ""}</td></tr>`;
@@ -201,7 +201,7 @@ function renderCC() {
     return html;
   }).join("");
   const s = k => rows.reduce((a, r) => a + r[k], 0);
-  $("ccf").innerHTML = `<tr><td>Total</td><td>${g.filter(x => x.cc).length} centros de costo</td><td></td><td class="num">${rows.length}</td><td class="num">${fmt(s("neto"))}</td><td class="num">${fmt(s("iva"))}</td><td class="num">${fmt(s("perc"))}</td><td class="num">${fmt(s("otros"))}</td><td class="num big">$ ${fmt(s("total"))}</td></tr>`;
+  $("ccf").innerHTML = `<tr><td class="code">Total</td><td class="desc">${g.filter(x => x.cc).length} centros de costo</td><td class="sh"></td><td class="num n" data-l="Patentes">${rows.length}</td><td class="num" data-l="Neto">${fmt(s("neto"))}</td><td class="num" data-l="IVA">${fmt(s("iva"))}</td><td class="num" data-l="Perc. IVA">${fmt(s("perc"))}</td><td class="num" data-l="Otros imp.">${fmt(s("otros"))}</td><td class="num big">$ ${fmt(s("total"))}</td></tr>`;
 }
 /* Filtros encadenados: cada lista muestra solo lo que existe con los demás filtros aplicados */
 const FILS = [["all", "Todas las patentes"], ["none", "Sin centro de costo"], ["done", "Con centro de costo"], ["bad", "Con CC inválido o inhabilitado"], ["new", "Nuevas en este período"]];
@@ -257,19 +257,25 @@ function renderPat() {
   $("tb").innerHTML = !v.length ? `<tr><td colspan="13" class="empty">Ninguna patente coincide con la búsqueda o el filtro.</td></tr>` :
     v.map(r => {
       const st = ccStatus(r.cc); return `<tr data-p="${esc(r.patente)}" class="${S.sel.has(r.patente) ? "sel" : ""}">
-      <td><input type="checkbox" class="rs" ${S.sel.has(r.patente) ? "checked" : ""} aria-label="Seleccionar ${esc(r.patente)}"></td>
+      <td class="chk"><input type="checkbox" class="rs" ${S.sel.has(r.patente) ? "checked" : ""} aria-label="Seleccionar ${esc(r.patente)}"></td>
       <td class="cert">${r.cert ?? ""}</td>
-      <td><span class="plate"><span>${esc(r.patente)}</span></span>${r.nuevo ? '<span class="new">Nueva</span>' : ""}</td>
+      <td class="pat"><span class="plate"><span>${esc(r.patente)}</span></span>${r.nuevo ? '<span class="new">Nueva</span>' : ""}</td>
       <td class="marca">${esc(r.marca)}<small>${esc(r.anio)}</small></td>
-      <td>${r.zona ? `<span class="zona">${esc(r.zona)}</span>` : `<span class="zona none">Sin zona</span>`}</td>
-      <td><div class="cc ${st.cls}"><input class="ccin" list="cclist" value="${esc(r.cc)}" placeholder="Elegí o escribí el CC" aria-label="Centro de costo de ${esc(r.patente)}"><small title="${esc(st.txt)}">${esc(st.txt)}</small></div></td>
-      <td class="num">${fmt(r.base)}</td><td class="num">${fmtPct(r.pct)}</td>
-      <td class="num">${fmt(r.neto)}</td><td class="num">${fmt(r.iva)}</td><td class="num">${fmt(r.perc)}</td><td class="num">${fmt(r.otros)}</td>
-      <td class="num tot">${fmt(r.total)}</td></tr>`;
+      <td class="zn">${r.zona ? `<span class="zona">${esc(r.zona)}</span>` : `<span class="zona none">Sin zona</span>`}</td>
+      <td class="ccc"><div class="cc ${st.cls}"><input class="ccin" list="cclist" value="${esc(r.cc)}" placeholder="Elegí o escribí el CC" aria-label="Centro de costo de ${esc(r.patente)}"><small title="${esc(st.txt)}">${esc(st.txt)}</small></div></td>
+      <td class="num" data-l="Premio">${fmt(r.base)}</td><td class="num" data-l="%">${fmtPct(r.pct)}</td>
+      <td class="num" data-l="Neto">${fmt(r.neto)}</td><td class="num" data-l="IVA">${fmt(r.iva)}</td><td class="num" data-l="Perc. IVA">${fmt(r.perc)}</td><td class="num" data-l="Otros imp.">${fmt(r.otros)}</td>
+      <td class="num tot" data-l="Total">${fmt(r.total)}</td></tr>`;
     }).join("");
   const s = k => v.reduce((a, r) => a + r[k], 0);
-  $("tf").innerHTML = `<tr><td></td><td colspan="5">${v.length !== rows.length ? `Subtotal ${v.length} patentes visibles` : `Total ${rows.length} patentes`}</td><td class="num">${fmt(s("base"))}</td><td class="num">${fmtPct(s("pct"))}</td><td class="num">${fmt(s("neto"))}</td><td class="num">${fmt(s("iva"))}</td><td class="num">${fmt(s("perc"))}</td><td class="num">${fmt(s("otros"))}</td><td class="num">${fmt(s("total"))}</td></tr>`;
-  document.querySelectorAll("#patview th[data-sort]").forEach(th => { th.classList.toggle("asc", th.dataset.sort === S.sort.k && S.sort.dir === 1); th.classList.toggle("desc", th.dataset.sort === S.sort.k && S.sort.dir === -1); });
+  $("tf").innerHTML = !v.length ? "" : `<tr><td class="chk"></td><td class="lbl" colspan="5">${v.length !== rows.length ? `Subtotal ${v.length} patentes visibles` : `Total ${rows.length} patentes`}</td><td class="num" data-l="Premio">${fmt(s("base"))}</td><td class="num" data-l="%">${fmtPct(s("pct"))}</td><td class="num" data-l="Neto">${fmt(s("neto"))}</td><td class="num" data-l="IVA">${fmt(s("iva"))}</td><td class="num" data-l="Perc. IVA">${fmt(s("perc"))}</td><td class="num" data-l="Otros imp.">${fmt(s("otros"))}</td><td class="num tot" data-l="Total">${fmt(s("total"))}</td></tr>`;
+  document.querySelectorAll("#patview th[data-sort]").forEach(th => {
+    const on = th.dataset.sort === S.sort.k;
+    th.classList.toggle("asc", on && S.sort.dir === 1); th.classList.toggle("desc", on && S.sort.dir === -1);
+    th.setAttribute("aria-sort", on ? (S.sort.dir === 1 ? "ascending" : "descending") : "none");
+  });
+  const sv = S.sort.k + ":" + S.sort.dir, ss = $("sortsel");
+  if ([...ss.options].some(o => o.value === sv)) ss.value = sv;
   syncBulk();
 }
 function setView(v) {
@@ -299,7 +305,7 @@ $("tb").addEventListener("change", e => {
   if (e.target.classList.contains("ccin")) assign([pt], codeFrom(e.target.value));
 });
 function syncBulk() {
-  const n = S.sel.size; $("bulk").classList.toggle("on", n > 0); $("bulk-n").textContent = n === 1 ? "1 seleccionada" : `${n} seleccionadas`;
+  const n = S.sel.size; $("bulk").classList.toggle("on", n > 0); document.body.classList.toggle("bulk-on", n > 0); setBulkH(); $("bulk-n").textContent = n === 1 ? "1 seleccionada" : `${n} seleccionadas`;
   const vis = [...$("tb").querySelectorAll("tr[data-p]")].map(t => t.dataset.p), all = $("all");
   all.checked = vis.length > 0 && vis.every(p => S.sel.has(p)); all.indeterminate = !all.checked && vis.some(p => S.sel.has(p));
 }
@@ -314,7 +320,13 @@ $("bulk-ok").addEventListener("click", async () => {
 });
 $("bulk-clear").addEventListener("click", async () => { const pats = [...S.sel]; if (await assign(pats, "")) { S.sel.clear(); refreshViews(); } });
 $("bulk-x").addEventListener("click", () => { S.sel.clear(); renderPat(); });
-document.querySelectorAll("#patview th[data-sort]").forEach(th => th.addEventListener("click", () => { const k = th.dataset.sort; S.sort = { k, dir: S.sort.k === k ? -S.sort.dir : 1 }; renderPat(); }));
+document.querySelectorAll("#patview th[data-sort]").forEach(th => {
+  th.tabIndex = 0;
+  const go = () => { const k = th.dataset.sort; S.sort = { k, dir: S.sort.k === k ? -S.sort.dir : 1 }; renderPat(); };
+  th.addEventListener("click", go);
+  th.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+});
+$("sortsel").addEventListener("change", e => { const [k, d] = e.target.value.split(":"); S.sort = { k, dir: +d }; renderPat(); });
 $("q").addEventListener("input", e => { S.q = e.target.value; renderPat(); });
 $("fil").addEventListener("change", e => { S.fil = e.target.value; S.sel.clear(); renderPat(); });
 $("fclear").addEventListener("click", () => { S.fil = "all"; S.zf = ""; S.q = ""; $("q").value = ""; S.sel.clear(); renderPat(); });
@@ -632,12 +644,23 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && !$("app").hidden && $("upload").hidden) reload(); });
 }
 
-
-/* Encabezado fijo: la altura se usa para que los títulos de la tabla queden justo debajo */
+/* Encabezado fijo: su altura ubica la barra de selección y los títulos de la tabla justo debajo.
+   En tablet y celular el encabezado se desliza hacia arriba hasta dejar visibles solo las pestañas (--hpin). */
+function setBulkH() {
+  const b = $("bulk"), on = b.classList.contains("on"), fixed = getComputedStyle(b).position === "fixed";
+  document.documentElement.style.setProperty("--bh", on && !fixed ? b.offsetHeight + "px" : "0px");
+  document.documentElement.style.setProperty("--bfix", on && fixed ? b.offsetHeight + "px" : "0px");
+}
 (() => {
-  const h = document.querySelector("header.top");
+  const h = document.querySelector("header.top"), tabs = $("tabs");
   if (!h) return;
-  const setH = () => document.documentElement.style.setProperty("--hh", h.offsetHeight + "px");
+  const setH = () => {
+    const r = document.documentElement.style;
+    r.setProperty("--hh", h.offsetHeight + "px");
+    r.setProperty("--hpin", (tabs.hidden ? h.offsetHeight : Math.max(0, tabs.offsetTop - 8)) + "px");
+    setBulkH();
+  };
   setH();
-  if ("ResizeObserver" in window) new ResizeObserver(setH).observe(h); else addEventListener("resize", setH);
+  if ("ResizeObserver" in window) { const ro = new ResizeObserver(setH); ro.observe(h); ro.observe($("bulk")); }
+  addEventListener("resize", setH);
 })();
