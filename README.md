@@ -7,22 +7,18 @@ Cada semestre se suben la póliza (PDF), la factura (PDF) y, si cambiaron, la ba
 ## Stack
 
 - Vite + JavaScript, sin framework. Se despliega en Vercel como sitio estático.
-- Supabase: Postgres con RLS y Auth con email y contraseña.
+- Supabase: Postgres con RLS. Se ingresa solo con el correo, que tiene que estar en la tabla `seg_usuarios` (sin contraseña).
 - `pdfjs-dist` para leer los PDF y SheetJS (`xlsx`) para leer y exportar Excel. SheetJS se instala desde su CDN oficial, porque la versión publicada en npm está desactualizada.
 
 ## Puesta en marcha
 
 ### 1. Supabase
 
-1. En el proyecto, abrí **SQL Editor** y ejecutá el contenido de `supabase/migrations/20261112120000_seguros_cc.sql`. Si usás la CLI, alcanza con `supabase db push`.
-2. Creá los usuarios en **Authentication → Users → Add user**, con la opción *Auto Confirm User*.
-3. Habilitalos en la aplicación. Solo los emails cargados en esta tabla pueden ver o modificar datos:
-   ```sql
-   insert into public.seg_usuarios (email, nombre) values
-     ('nombre@empresa.com', 'Nombre Apellido');
-   ```
-4. Desactivá el registro público en **Authentication → Sign In / Providers → Allow new users to sign up**.
-5. Copiá la **Publishable key** desde **Project Settings → API Keys**. Si el proyecto todavía usa las claves anteriores, la `anon` key funciona igual.
+1. En el proyecto, abrí **SQL Editor**, pegá el contenido completo de `supabase/migrations/20261112120000_seguros_cc.sql` y ejecutalo. Crea las tablas, las vistas y las funciones. Se puede ejecutar más de una vez sin perder datos. Si usás la CLI, alcanza con `supabase db push`.
+2. Ejecutá `supabase/usuarios.sql` para cargar los correos habilitados.
+   - Para agregar a alguien, sumá una línea en ese archivo y volvé a ejecutarlo.
+   - Para dar de baja a alguien: `update public.seg_usuarios set activo = false where email = 'correo@fabricasrl.com.ar';`
+3. Copiá la **Publishable key** desde **Project Settings → API Keys**. Si el proyecto todavía usa las claves anteriores, la `anon` key funciona igual.
 
 ### 2. GitHub y Vercel
 
@@ -38,7 +34,6 @@ Cada semestre se suben la póliza (PDF), la factura (PDF) y, si cambiaron, la ba
    - `VITE_SUPABASE_URL` = `https://oixzkvkybqexvrzwzwis.supabase.co`
    - `VITE_SUPABASE_PUBLISHABLE_KEY` = la clave del paso 1.5
 4. Hacé clic en **Deploy**. Si cambiás las variables después, hay que volver a desplegar, porque se incrustan en el build.
-5. En Supabase, en **Authentication → URL Configuration**, poné la URL de Vercel como *Site URL*.
 
 ### Desarrollo local
 
@@ -52,7 +47,7 @@ Requiere Node 22.12 o superior.
 
 ## Uso
 
-1. Ingresá con tu usuario.
+1. Abrí la URL de la aplicación e ingresá con tu correo de la empresa. La app lo recuerda en ese navegador hasta que tocás «Salir».
 2. **Cargar nuevo período** → arrastrá los archivos juntos. La aplicación reconoce cada uno:
    - **Póliza** (PDF): de cada certificado toma patente, marca completa, año, valor del vehículo y premio.
    - **Factura** (PDF): toma neto, IVA, percepción, otros impuestos y total.
@@ -65,11 +60,15 @@ Requiere Node 22.12 o superior.
 
 El prorrateo se hace por **valor del vehículo** por defecto. Se puede cambiar a **premio del certificado** con el selector. Cada concepto se reparte al centavo con el método del mayor resto, así cada columna suma exactamente lo facturado.
 
+## Íconos
+
+Los íconos están en `public/`: `favicon.ico` y `favicon.svg` (escudo simplificado, legible en la pestaña), `icon.svg` (vehículo con escudo), `apple-touch-icon.png`, `icon-192.png`, `icon-512.png` e `icon-maskable-512.png` para Android. `manifest.webmanifest` permite instalar la app en el celular o el escritorio. Los colores son los del logo de la empresa: azul `#0A4088` y rojo `#BA1212`.
+
 ## Modelo de datos
 
 | Tabla / vista | Contenido |
 | --- | --- |
-| `seg_usuarios` | Emails habilitados. |
+| `seg_usuarios` | Correos habilitados para ingresar (con nombre y estado activo). |
 | `seg_centros_costo` | Base de CC vigente (se reemplaza completa al subir una nueva). |
 | `seg_zonas` | Zona por patente (se reemplaza completa al subir una nueva). |
 | `seg_asignaciones` | Último CC conocido por patente; precarga los períodos nuevos. |
@@ -88,7 +87,17 @@ where periodo_id = '0027-00233598'
 order by total desc;
 ```
 
-Todas las escrituras pasan por funciones transaccionales (`seg_guardar_periodo`, `seg_asignar_cc`, `seg_cambiar_metodo`, `seg_reemplazar_centros_costo`, `seg_reemplazar_zonas`). Estas funciones verifican que el usuario esté en `seg_usuarios`.
+Todas las escrituras pasan por funciones transaccionales (`seg_guardar_periodo`, `seg_asignar_cc`, `seg_cambiar_metodo`, `seg_reemplazar_centros_costo`, `seg_reemplazar_zonas`).
+
+## Seguridad
+
+Se ingresa solo con el correo, sin contraseña. La app envía ese correo a Supabase en cada consulta (encabezado `x-usuario`), y la base solo muestra datos y acepta cambios si está en `seg_usuarios` y activo. Además, cada período y cada asignación registran qué correo los hizo.
+
+Esto controla quién usa la app, pero no es una autenticación fuerte: alguien que conozca un correo habilitado y la URL podría ingresar. Para acotar el riesgo:
+
+- Las tablas son de solo lectura para la API. No se pueden borrar ni editar filas directamente; solo a través de las funciones de la aplicación.
+- Conviene no publicar la URL fuera de la empresa.
+- Si más adelante hace falta más seguridad sin contraseñas, Supabase permite ingresar con un enlace que llega al correo (*magic link*), y Vercel ofrece **Deployment Protection** en **Settings → Deployment Protection**.
 
 ## Si cambia el formato de la póliza
 

@@ -4,43 +4,42 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Seguros automotor por centro de costo</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚚</text></svg>">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0A4088">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
 <div class="wrap">
-  <!-- ACCESO -->
+  <!-- INGRESO -->
   <section class="panel login" id="login" hidden>
+    <img class="login-icon" src="/icon.svg" alt="" width="72" height="72">
     <h1>Seguros automotor por centro de costo</h1>
-    <p>Ingresá con tu usuario de la empresa.</p>
+    <p>Ingresá con tu correo de la empresa.</p>
     <form id="loginf" novalidate>
-      <label for="lemail">Email</label>
-      <input class="txt" id="lemail" type="email" autocomplete="username" required>
-      <label for="lpass">Contraseña</label>
-      <input class="txt" id="lpass" type="password" autocomplete="current-password" required>
+      <label for="lemail">Correo</label>
+      <input class="txt" id="lemail" type="email" autocomplete="email" inputmode="email" required>
       <button class="btn primary" type="submit" id="lbtn">Ingresar</button>
       <div class="err" id="lerr" role="alert"></div>
     </form>
-  </section>
-  <section class="panel login" id="noacc" hidden>
-    <h1>Sin acceso</h1>
-    <p id="noacc-t"></p>
-    <button class="btn" type="button" id="noacc-out">Salir</button>
   </section>
   <div class="loading" id="loading">Cargando…</div>
 
   <div id="app" hidden>
   <header class="top">
     <div>
-      <h1>Seguros automotor por centro de costo</h1>
+      <h1 class="brand"><img src="/icon.svg" alt="" width="44" height="44">Seguros automotor por centro de costo</h1>
       <p class="sub" id="hsub">Cargá la póliza, la factura y la base de CC para ver cuánto le toca a cada centro de costo.</p>
     </div>
     <div class="hright">
       <select class="txt" id="per" aria-label="Período" hidden></select>
       <button class="btn" id="newper" type="button" hidden>Cargar nuevo período</button>
       <div class="sync user"><span id="uemail"></span><button class="linkbtn" type="button" id="logout">Salir</button></div>
+      
     </div>
   </header>
 
