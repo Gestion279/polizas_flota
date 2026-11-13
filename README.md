@@ -56,7 +56,7 @@ Requiere Node 22.12 o superior.
 3. Revisá los controles (cantidad de certificados, total de factura contra premio final de la póliza, patentes sin zona) y guardá.
 4. El **Dashboard** es la primera pestaña y resume el período visible con los datos guardados:
    - Indicadores: costo total de la factura, vehículos asegurados, centros de costo con vehículos, porcentaje de patentes con CC habilitado, patentes sin asignación y días de vigencia que quedan.
-   - Costo y participación por centro de costo (barras y anillo). Muestra los siete CC de mayor monto; el resto se agrupa en «Otros». Si tocás una barra, se abre ese CC en **Totales por CC**.
+   - Costo y participación por centro de costo (barras y anillo). Aparecen todos los CC del período, ordenados por monto, con el nombre completo y el importe al centavo, para cargar el prorrateo en Bejerman. La leyenda del anillo cierra con el total. Si tocás una barra, se abre ese CC en **Totales por CC**.
    - Estado de patentes, últimos períodos con la variación del total facturado contra el período anterior (el ojo abre ese período), y alertas: patentes sin CC o con CC inhabilitado, diferencia entre factura y prorrateo, patentes nuevas o sin zona, y la última carga de la base de CC. Las alertas con flecha llevan a las patentes correspondientes.
 5. En **Totales por CC** está el monto por centro de costo. Si tocás un CC, se ven sus patentes.
 6. En **Patentes y asignación** se asigna el CC: fila por fila, o en bloque filtrando por zona y seleccionando todas. El botón con la flecha abre un menú como el autofiltro de Excel: un buscador por código o nombre (sin importar mayúsculas ni tildes), la lista de CC habilitados con un casillero cada uno, y **Aceptar** / **Cancelar**. Con el teclado: ↓ o F4 abre el menú, ↑ ↓ recorren la lista, Enter acepta la opción marcada y Esc cancela. Si una patente tiene un CC que quedó inhabilitado, se marca en naranja y el menú pide elegir otro. También se puede importar un Excel con columnas `Patente` y `CC`; las filas con CC inhabilitados se omiten y se informan.
@@ -70,7 +70,7 @@ Los íconos están en `public/`: `favicon.ico` y `favicon.svg` (escudo simplific
 
 ## Colores
 
-La paleta está definida una sola vez en las variables de `:root` al comienzo de `src/style.css`, con una versión para modo claro y otra para modo oscuro, y la usan todas las pantallas en escritorio y celular. El verde azulado oscuro `#1E4952` se usa en títulos y encabezados de tarjetas, y el verde azulado `#1D7A70` en botones y enlaces. Los gráficos usan la serie `--s1` a `--s8`: `#2A9D8F`, `#264653`, `#8AB17D`, `#E9A23B`, `#E76F51`, `#9DB4C0`, `#5E8C6A` y `#B07AA1`. Verde, naranja y rojo indican estado: correcto, pendiente y error.
+La paleta está definida una sola vez en las variables de `:root` al comienzo de `src/style.css`, con una versión para modo claro y otra para modo oscuro, y la usan todas las pantallas en escritorio y celular. El verde azulado oscuro `#1E4952` se usa en títulos y encabezados de tarjetas, y el verde azulado `#1D7A70` en botones y enlaces. Los gráficos usan la serie `--s1` a `--s12`: `#2A9D8F`, `#264653`, `#8AB17D`, `#E9A23B`, `#E76F51`, `#9DB4C0`, `#5E8C6A`, `#B07AA1`, `#4F7CAC`, `#8E6C4A`, `#7A5C99` y `#D9A6A0`. Si hay más de doce CC, los colores se repiten en tonos más claros y más oscuros. Verde, naranja y rojo indican estado: correcto, pendiente y error.
 
 ## Modelo de datos
 
