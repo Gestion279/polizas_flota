@@ -7,17 +7,15 @@ Cada semestre se suben la póliza (PDF), la factura (PDF) y, si cambiaron, la ba
 ## Stack
 
 - Vite + JavaScript, sin framework. Se despliega en Vercel como sitio estático.
-- Supabase: Postgres con RLS. Se ingresa solo con el correo, que tiene que estar en la tabla `seg_usuarios` (sin contraseña).
+- Supabase: Postgres con RLS. Se ingresa solo con el correo, que tiene que estar en la tabla `seg_usuarios` (sin contraseña). Cada usuario tiene un rol: Administrador, Operador o Lectura.
 - `pdfjs-dist` para leer los PDF y SheetJS (`xlsx`) para leer y exportar Excel. SheetJS se instala desde su CDN oficial, porque la versión publicada en npm está desactualizada.
 
 ## Puesta en marcha
 
 ### 1. Supabase
 
-1. En el proyecto, abrí **SQL Editor**, pegá el contenido completo de `supabase/migrations/20261112120000_seguros_cc.sql` y ejecutalo. Crea las tablas, las vistas y las funciones. Después ejecutá `supabase/migrations/20261112150000_prorrateo_solo_premio.sql`, que fija el prorrateo por premio, `supabase/migrations/20261113120000_cc_solo_habilitados.sql`, que impide guardar asignaciones con CC inhabilitados, y `supabase/migrations/20261114120000_factura_pdf.sql`, que guarda el PDF de cada factura. Todos se pueden ejecutar más de una vez sin perder datos. Si usás la CLI, alcanza con `supabase db push`.
-2. Ejecutá `supabase/usuarios.sql` para cargar los correos habilitados.
-   - Para agregar a alguien, sumá una línea en ese archivo y volvé a ejecutarlo.
-   - Para dar de baja a alguien: `update public.seg_usuarios set activo = false where email = 'correo@fabricasrl.com.ar';`
+1. En el proyecto, abrí **SQL Editor**, pegá el contenido completo de `supabase/migrations/20261112120000_seguros_cc.sql` y ejecutalo. Crea las tablas, las vistas y las funciones. Después ejecutá `supabase/migrations/20261112150000_prorrateo_solo_premio.sql`, que fija el prorrateo por premio, `supabase/migrations/20261113120000_cc_solo_habilitados.sql`, que impide guardar asignaciones con CC inhabilitados, `supabase/migrations/20261114120000_factura_pdf.sql`, que guarda el PDF de cada factura, y `supabase/migrations/20261115120000_roles_usuarios.sql`, que agrega los roles, el registro de actividad y la hoja Usuarios, y `supabase/migrations/20261116120000_solo_admin_sube_archivos.sql`, que deja la subida de archivos solo al Administrador. Todos se pueden ejecutar más de una vez sin perder datos. Si usás la CLI, alcanza con `supabase db push`.
+2. Ejecutá `supabase/usuarios.sql` para cargar los usuarios iniciales con su rol. Después, los usuarios se agregan, se desactivan y se les cambia el rol desde la hoja **Usuarios** de la app. Ese archivo queda para recuperar el acceso de un administrador.
 3. Copiá la **Publishable key** desde **Project Settings → API Keys**. Si el proyecto todavía usa las claves anteriores, la `anon` key funciona igual.
 
 ### 2. GitHub y Vercel
@@ -62,6 +60,20 @@ Requiere Node 22.12 o superior.
 6. En **Totales por CC** está el monto por centro de costo. Si tocás un CC, se ven sus patentes.
 7. En **Patentes y asignación** se asigna el CC: fila por fila, o en bloque filtrando por zona y seleccionando todas. El botón con la flecha abre un menú como el autofiltro de Excel: un buscador por código o nombre (sin importar mayúsculas ni tildes), la lista de CC habilitados con un casillero cada uno, y **Aceptar** / **Cancelar**. Con el teclado: ↓ o F4 abre el menú, ↑ ↓ recorren la lista, Enter acepta la opción marcada y Esc cancela. Si una patente tiene un CC que quedó inhabilitado, se marca en naranja y el menú pide elegir otro. También se puede importar un Excel con columnas `Patente` y `CC`; las filas con CC inhabilitados se omiten y se informan.
 8. **Exportar a Excel** genera tres hojas: totales por CC, detalle por patente y datos de la factura.
+9. **Usuarios** (solo Administrador): lista de usuarios con su rol, si está activo, cuántas veces ingresó y cuándo fue el último ingreso. Desde ahí se agregan usuarios, se cambia el rol y se activan o desactivan. Debajo está la **Actividad**: quién asignó CC, actualizó zonas, cargó períodos o bases, subió PDF o modificó usuarios, filtrable por usuario y con la opción de ver los ingresos. Tocar el nombre de un usuario filtra su actividad. Un usuario desactivado no puede entrar, pero su nombre se conserva en la actividad. Siempre tiene que quedar al menos un administrador activo.
+
+## Roles
+
+| Acción | Lectura | Operador | Administrador |
+| --- | :-: | :-: | :-: |
+| Ver Dashboard, Totales por CC y Patentes, exportar a Excel y abrir el PDF de la factura | ✓ | ✓ | ✓ |
+| Asignar o quitar CC (fila por fila o en bloque) | | ✓ | ✓ |
+| Subir archivos: póliza, factura, base de CC, zonas, asignaciones desde Excel y PDF de la factura | | | ✓ |
+| Hoja Usuarios y actividad | | | ✓ |
+
+La app oculta los controles que el rol no puede usar, y la base rechaza la operación aunque se llame directamente. Solo el Administrador sube archivos. La importación de asignaciones desde Excel la limita la app, porque usa la misma función que la asignación en bloque. El reparto está en `seg_puede` (última versión en `20261116120000_solo_admin_sube_archivos.sql`) y en `PERMISOS` (`src/main.js`); si cambia, se ajusta en los dos lugares. Si a alguien le cambian el rol con la app abierta, se actualiza al volver a la pestaña o al intentar una acción que ya no tiene permitida.
+
+Un ingreso se registra al entrar con el correo o al abrir la app ya recordada; abrirla varias veces en 30 minutos cuenta como uno. Los ingresos se cuentan desde que se aplicó la migración de roles; la actividad anterior se recuperó de lo que ya estaba guardado (períodos, bases, PDF y la última asignación de cada patente).
 
 El prorrateo se hace por **valor del vehículo** por defecto. Se puede cambiar a **premio del certificado** con el selector. Cada concepto se reparte al centavo con el método del mayor resto, así cada columna suma exactamente lo facturado.
 
@@ -77,7 +89,8 @@ La paleta está definida una sola vez en las variables de `:root` al comienzo de
 
 | Tabla / vista | Contenido |
 | --- | --- |
-| `seg_usuarios` | Correos habilitados para ingresar (con nombre y estado activo). |
+| `seg_usuarios` | Correos habilitados para ingresar, con nombre, rol (`admin`, `operador`, `lectura`) y estado activo. |
+| `seg_actividad` | Ingresos y cambios de cada usuario. Solo se lee con `seg_actividad_listar`. |
 | `seg_centros_costo` | Base de CC vigente (se reemplaza completa al subir una nueva). |
 | `seg_zonas` | Zona por patente (se reemplaza completa al subir una nueva). |
 | `seg_asignaciones` | Último CC conocido por patente; precarga los períodos nuevos. |
@@ -97,17 +110,17 @@ where periodo_id = '0027-00233598'
 order by total desc;
 ```
 
-Todas las escrituras pasan por funciones transaccionales (`seg_guardar_periodo`, `seg_asignar_cc`, `seg_cambiar_metodo`, `seg_reemplazar_centros_costo`, `seg_reemplazar_zonas`).
+Todas las escrituras pasan por funciones transaccionales (`seg_guardar_periodo`, `seg_asignar_cc`, `seg_cambiar_metodo`, `seg_reemplazar_centros_costo`, `seg_reemplazar_zonas`, `seg_guardar_factura_pdf`, `seg_usuario_alta`, `seg_usuario_cambiar`), que controlan el rol con `seg_exigir` y registran la actividad.
 
 ## Seguridad
 
 Se ingresa solo con el correo, sin contraseña. La app envía ese correo a Supabase en cada consulta (encabezado `x-usuario`), y la base solo muestra datos y acepta cambios si está en `seg_usuarios` y activo. Además, cada período y cada asignación registran qué correo los hizo.
 
-Esto controla quién usa la app, pero no es una autenticación fuerte: alguien que conozca un correo habilitado y la URL podría ingresar. Para acotar el riesgo:
+Esto controla quién usa la app, pero no es una autenticación fuerte: alguien que conozca un correo habilitado y la URL podría ingresar. Lo mismo vale para los roles: quien sepa modificar los encabezados del navegador podría usar el correo de un administrador. Los roles ordenan el trabajo y evitan errores, pero no frenan a alguien que lo intente a propósito. Para acotar el riesgo:
 
 - Las tablas son de solo lectura para la API. No se pueden borrar ni editar filas directamente; solo a través de las funciones de la aplicación.
 - Conviene no publicar la URL fuera de la empresa.
-- Si más adelante hace falta más seguridad sin contraseñas, Supabase permite ingresar con un enlace que llega al correo (*magic link*), y Vercel ofrece **Deployment Protection** en **Settings → Deployment Protection**.
+- Si más adelante hace falta más seguridad sin contraseñas, Supabase permite ingresar con un código o un enlace que llega al correo (*magic link*), y Vercel ofrece **Deployment Protection** en **Settings → Deployment Protection**.
 
 ## Si cambia el formato de la póliza
 

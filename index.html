@@ -38,13 +38,14 @@
         <button role="tab" id="t-dash" aria-selected="true" type="button">Dashboard</button>
         <button role="tab" id="t-cc" aria-selected="false" type="button">Totales<span class="t-long"> por CC</span></button>
         <button role="tab" id="t-pat" aria-selected="false" type="button">Patentes<span class="t-long"> y asignación</span> <span class="cnt" id="t-cnt" hidden></span></button>
+        <button role="tab" id="t-usr" aria-selected="false" type="button" hidden>Usuarios</button>
       </div>
     </div>
     <div class="hright">
       <select class="txt" id="per" aria-label="Período" hidden></select>
       <button class="btn" id="newper" type="button" hidden>Cargar nuevo período</button>
       <button class="btn primary" id="exp" type="button" hidden>Exportar a Excel</button>
-      <div class="user"><span id="uemail"></span><button class="linkbtn" type="button" id="logout">Salir</button></div>
+      <div class="user"><span id="uemail"></span><span class="urol" id="urol"></span><button class="linkbtn" type="button" id="logout">Salir</button></div>
     </div>
   <section class="panel invoice" id="invoice" aria-label="Factura" hidden>
     <div class="inv-id">
@@ -83,6 +84,57 @@
       <button class="btn" id="cancel" type="button" hidden>Volver al período actual</button>
       <span class="note" id="savenote"></span>
     </div>
+  </section>
+
+  <!-- SIN PERÍODOS (roles que no cargan) -->
+  <section class="panel sinper" id="sinper" hidden>
+    <h2>Todavía no hay períodos cargados</h2>
+    <p>Cuando un administrador cargue la póliza y la factura del semestre, acá vas a ver el prorrateo por centro de costo.</p>
+  </section>
+
+  <!-- USUARIOS (solo Administrador) -->
+  <section class="panel usr" id="usrview" aria-labelledby="u-title" hidden>
+    <h2 id="u-title">Usuarios</h2>
+    <p class="usr-sub">Ingresan solo con su correo. Un usuario desactivado no puede entrar, pero su nombre se conserva en el registro de actividad.</p>
+    <div class="tablewrap"><table class="utable">
+      <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Activo</th><th class="num">Ingresó</th><th>Último ingreso</th></tr></thead>
+      <tbody id="ub"><tr><td colspan="6" class="empty">Cargando usuarios…</td></tr></tbody>
+    </table></div>
+
+    <form class="uadd" id="uadd" novalidate>
+      <h3>Agregar usuario</h3>
+      <div class="uadd-f">
+        <label>Nombre<input class="txt" id="ua-nombre" autocomplete="off" required></label>
+        <label>Correo<input class="txt" id="ua-email" type="email" inputmode="email" autocomplete="off" placeholder="nombre@fabricasrl.com.ar" required></label>
+        <label>Rol<select class="txt" id="ua-rol">
+          <option value="lectura">Lectura</option>
+          <option value="operador">Operador</option>
+          <option value="admin">Administrador</option>
+        </select></label>
+        <button class="btn primary" type="submit" id="ua-btn">Agregar usuario</button>
+      </div>
+      <p class="err" id="ua-err" role="alert"></p>
+    </form>
+    <dl class="roles">
+      <div><dt>Administrador</dt><dd>Todo lo de Operador, más subir archivos (póliza, factura, base de CC, zonas, asignaciones desde Excel y PDF de la factura) y esta hoja.</dd></div>
+      <div><dt>Operador</dt><dd>Asigna centros de costo fila por fila o en bloque. No sube archivos.</dd></div>
+      <div><dt>Lectura</dt><dd>Ve todas las hojas, exporta a Excel y abre el PDF de la factura. No puede cambiar nada.</dd></div>
+    </dl>
+
+    <div class="act-h">
+      <h3 id="act-t">Actividad</h3>
+      <select class="txt" id="act-u" aria-label="Usuario"><option value="">Todos los usuarios</option></select>
+      <select class="txt" id="act-tipo" aria-label="Tipo de movimiento">
+        <option value="cambios">Cambios</option>
+        <option value="ingresos">Ingresos</option>
+        <option value="todo">Cambios e ingresos</option>
+      </select>
+    </div>
+    <div class="tablewrap"><table class="atable" aria-labelledby="act-t">
+      <thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Detalle</th></tr></thead>
+      <tbody id="ab"></tbody>
+    </table></div>
+    <p class="act-n" id="act-n"></p>
   </section>
 
   <!-- MAIN -->
