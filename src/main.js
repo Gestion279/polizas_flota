@@ -411,18 +411,20 @@ const ICON = {
   a_info: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.5" fill="currentColor"/><path d="M10 9v5" stroke="var(--ac-bg)" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="6.2" r="1.15" fill="var(--ac-bg)"/></svg>'
 };
 
+// 12 colores de la paleta; si hay más CC se repiten en tonos más claros y más oscuros
+function serieColor(i) {
+  const base = `var(--s${(i % 12) + 1})`, vuelta = Math.floor(i / 12);
+  if (!vuelta) return base;
+  return vuelta % 2 ? `color-mix(in srgb, ${base} 55%, var(--surface))` : `color-mix(in srgb, ${base} 65%, var(--ink))`;
+}
 function dashData() {
   const p = P(), n = rows.length, F = totFact(p), T = rows.reduce((a, r) => a + r.total, 0);
   const sin = rows.filter(r => !r.cc).length;
   const val = rows.filter(r => ccHabilitado(r.cc)).length;
   const inc = n - sin - val;
-  // Centros de costo ordenados por monto; desde el octavo se agrupan en «Otros»
-  const g = groupByCC(), con = g.filter(x => x.cc).sort((a, b) => b.total - a.total), MAXN = 7;
-  const items = con.slice(0, con.length > MAXN + 1 ? MAXN : con.length).map((x, i) => ({ key: x.cc, label: ccLabel(x.cc), total: x.total, color: `var(--s${i + 1})`, bad: !ccHabilitado(x.cc) }));
-  if (con.length > MAXN + 1) {
-    const rest = con.slice(MAXN);
-    items.push({ key: "__otros", label: `Otros ${rest.length} CC`, total: rest.reduce((a, x) => a + x.total, 0), color: "var(--s8)" });
-  }
+  // Todos los centros de costo, ordenados por monto (se usan para cargar el prorrateo en Bejerman)
+  const g = groupByCC(), con = g.filter(x => x.cc).sort((a, b) => b.total - a.total);
+  const items = con.map((x, i) => ({ key: x.cc, label: ccLabel(x.cc), total: x.total, color: serieColor(i), bad: !ccHabilitado(x.cc) }));
   const none = g.find(x => !x.cc);
   if (none) items.push({ key: "__none", label: "Sin centro de costo", total: none.total, color: "var(--warn)", none: true });
   return { p, n, F, T, sin, val, inc, items, ccUsados: con.length, nuevas: rows.filter(r => r.nuevo).length, sinZona: rows.filter(r => !r.zona).length };
@@ -469,14 +471,15 @@ function renderDash() {
   $("d-bars").innerHTML = !d.items.length ? `<p class="dempty">El período no tiene patentes.</p>` :
     `<div class="bars">${d.items.map(x => `<button type="button" class="brow${x.none ? " none" : ""}${x.bad ? " bad" : ""}" data-cc="${esc(x.key)}" title="Ver ${esc(x.label)} en Totales por CC">
         <span class="bl">${esc(x.label)}${x.bad ? `<small>${ccMap.has(x.key) ? "inhabilitado" : "no existe en la base"}</small>` : ""}</span>
-        <span class="bt"><i style="--w:${(x.total / ax.max).toFixed(4)};background:${x.color}"></i><em>${fmt0(x.total)}</em></span>
+        <span class="bt"><i style="--w:${(x.total / ax.max).toFixed(4)};background:${x.color}"></i><em>$ ${fmt(x.total)}</em></span>
         <span class="bp">${pct1(d.T ? x.total / d.T : 0)}</span></button>`).join("")}
       <div class="baxis" aria-hidden="true"><span></span><span class="bt">${ticks.map(t => `<b style="--w:${(t / ax.max).toFixed(4)}">${t ? fmtAxis(t) : "0"}</b>`).join("")}</span><span></span></div></div>`;
 
   // Anillo: participación
   $("d-donut").innerHTML = !d.items.length ? `<p class="dempty">El período no tiene patentes.</p>` :
     `<div class="dsplit">${donut(d.items.map(x => ({ v: x.total, color: x.color, title: `${x.label}: ${fmt0(x.total)}` })), 190, 40, { v: fmtM(d.T), l: "Total", aria: `Participación por centro de costo, total ${fmt0(d.T)}` })}
-      <ul class="legend">${d.items.map(x => `<li><i style="background:${x.color}"></i><span>${esc(x.label)}</span><b>${pct1(d.T ? x.total / d.T : 0)}</b></li>`).join("")}</ul></div>`;
+      <ul class="legend full">${d.items.map(x => `<li><i style="background:${x.color}"></i><span>${esc(x.label)}</span><em>$ ${fmt(x.total)}</em><b>${pct1(d.T ? x.total / d.T : 0)}</b></li>`).join("")}
+        <li class="lt"><i></i><span>Total · ${d.items.filter(x => !x.none).length} centros de costo${d.items.some(x => x.none) ? " y sin CC" : ""}</span><em>$ ${fmt(d.T)}</em><b>100%</b></li></ul></div>`;
 
   // Estado de patentes
   const pct = d.n ? d.val / d.n : 0;
@@ -532,7 +535,7 @@ $("dashview").addEventListener("click", e => {
   const go = e.target.closest("[data-go]");
   if (go) { if (go.dataset.go === "cc") { setView("cc"); scrollTo(0, 0); } else goPat(go.dataset.go); return; }
   const b = e.target.closest(".brow");
-  if (b) { const k = b.dataset.cc; if (k !== "__otros") S.open.add(k); setView("cc"); renderCC(); scrollTo(0, 0); return; }
+  if (b) { const k = b.dataset.cc; S.open.add(k); setView("cc"); renderCC(); scrollTo(0, 0); return; }
   const pe = e.target.closest(".peye");
   if (pe) { S.actual = pe.dataset.per; localStorage.setItem("seg-periodo", S.actual); S.sel.clear(); S.open.clear(); reload({ soloPeriodo: true }); scrollTo(0, 0); return; }
   if (e.target.closest("#d-hist")) { S.dashAll = !S.dashAll; renderDash(); }
