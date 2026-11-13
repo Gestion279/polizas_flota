@@ -68,7 +68,7 @@ const S = {
   bases: {},              // tipo -> {archivo, filas, detalle, cargado_en}
   zonas: {},              // patente -> zona
   asignadas: new Set(),   // patentes con CC recordado
-  view: "cc", q: "", fil: "all", zf: "", bulkCC: "", sel: new Set(), sort: { k: "cert", dir: 1 }, open: new Set(),
+  view: "dash", dashAll: false, q: "", fil: "all", zf: "", bulkCC: "", sel: new Set(), sort: { k: "cert", dir: 1 }, open: new Set(),
   up: { poliza: null, factura: null, cc: null, zona: null }
 };
 let ccMap = new Map();
@@ -155,9 +155,9 @@ function renderAll() {
   sel.innerHTML = S.periodos.map(x => `<option value="${esc(x.id)}" ${x.id === S.actual ? "selected" : ""}>${esc(isoToAr(x.vigencia_desde))} al ${esc(isoToAr(x.vigencia_hasta))} · Fact. ${esc(x.id)}</option>`).join("");
   if (!p) { $("main").hidden = true; $("invoice").hidden = true; showUpload(true); $("hsub").textContent = "Cargá la póliza, la factura y la base de CC para ver cuánto le toca a cada centro de costo."; return; }
   if ($("upload").dataset.forced !== "1") $("upload").hidden = true;
-  $("main").hidden = false; $("invoice").hidden = false;
+  $("main").hidden = false;
   $("hsub").textContent = `Póliza ${p.poliza || ""} · ${p.tomador || ""} · Vigencia ${isoToAr(p.vigencia_desde)} al ${isoToAr(p.vigencia_hasta)} · ${rows.length} vehículos`;
-  renderInvoice(p); renderProgress(); renderCC(); renderPat();
+  renderInvoice(p); renderProgress(); renderDash(); renderCC(); renderPat(); setView(S.view);
 }
 function renderInvoice(p) {
   $("i-num").textContent = "Factura " + p.id;
@@ -277,10 +277,14 @@ function renderPat() {
   syncBulk();
 }
 function setView(v) {
-  S.view = v; $("ccview").hidden = v !== "cc"; $("patview").hidden = v !== "pat";
-  $("t-cc").setAttribute("aria-selected", v === "cc"); $("t-pat").setAttribute("aria-selected", v === "pat");
+  S.view = v;
+  $("dashview").hidden = v !== "dash"; $("tblpanel").hidden = v === "dash";
+  $("ccview").hidden = v !== "cc"; $("patview").hidden = v !== "pat";
+  // En el Dashboard los importes de la factura ya están en los indicadores
+  $("invoice").hidden = !P() || v === "dash";
+  ["dash", "cc", "pat"].forEach(x => $("t-" + x).setAttribute("aria-selected", v === x));
 }
-function refreshViews() { const y = scrollY; renderProgress(); renderCC(); renderPat(); scrollTo(0, y); }
+function refreshViews() { const y = scrollY; renderProgress(); renderDash(); renderCC(); renderPat(); scrollTo(0, y); }
 
 /* ================= Asignación ================= */
 async function assign(pats, code) {
@@ -354,6 +358,7 @@ $("q").addEventListener("input", e => { S.q = e.target.value; renderPat(); });
 $("fil").addEventListener("change", e => { S.fil = e.target.value; S.sel.clear(); renderPat(); });
 $("fclear").addEventListener("click", () => { S.fil = "all"; S.zf = ""; S.q = ""; $("q").value = ""; S.sel.clear(); renderPat(); });
 $("zf").addEventListener("change", e => { S.zf = e.target.value; S.sel.clear(); renderPat(); });
+$("t-dash").addEventListener("click", () => setView("dash"));
 $("t-cc").addEventListener("click", () => setView("cc"));
 $("t-pat").addEventListener("click", () => setView("pat"));
 function toggleCC(row) { const k = row.dataset.k; S.open.has(k) ? S.open.delete(k) : S.open.add(k); renderCC(); }
@@ -364,6 +369,174 @@ $("ccb").addEventListener("click", e => {
 $("ccb").addEventListener("keydown", e => { const row = e.target.closest(".ccrow"); if (row && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggleCC(row); } });
 $("asig").addEventListener("click", () => { S.fil = "none"; S.zf = ""; S.q = ""; $("q").value = ""; S.sel.clear(); setView("pat"); renderPat(); });
 $("per").addEventListener("change", async e => { S.actual = e.target.value; localStorage.setItem("seg-periodo", S.actual); S.sel.clear(); S.open.clear(); await reload({ soloPeriodo: true }); });
+
+/* ================= Dashboard =================
+   Todo se calcula con los datos guardados: las patentes del período visible
+   (seg_v_prorrateo), la factura y el historial de seg_periodos. */
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const pct1 = v => (v * 100).toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + "%";
+const fmt0 = n => "$ " + Math.round(n || 0).toLocaleString("es-AR");
+const fmtM = n => "$ " + (n / 1e6).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " M";
+const fmtAxis = n => n >= 1e6 ? (n / 1e6).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + " M" : n >= 1e3 ? (n / 1e3).toLocaleString("es-AR", { maximumFractionDigits: 0 }) + " k" : String(n);
+const fecha = d => { if (!d) return null; const [y, m, dd] = String(d).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, dd); };
+const fechaAr = d => { const x = d instanceof Date ? d : fecha(d); return x ? x.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" }) : ""; };
+const totFact = p => +p.neto + +p.iva + +p.percepcion + +p.otros_impuestos;
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+function perLabel(p) {
+  const a = fecha(p.vigencia_desde), b = fecha(p.vigencia_hasta);
+  if (!a || !b) return "Factura " + p.id;
+  return a.getFullYear() === b.getFullYear()
+    ? `${cap(MESES[a.getMonth()])} – ${MESES[b.getMonth()]} ${b.getFullYear()}`
+    : `${cap(MESES[a.getMonth()])} ${a.getFullYear()} – ${MESES[b.getMonth()]} ${b.getFullYear()}`;
+}
+const ccLabel = cc => { const c = ccMap.get(cc); return c && c.d ? `CC ${cc} · ${c.d}` : `CC ${cc}`; };
+function niceMax(v) {
+  if (v <= 0) return { max: 1, step: 1 };
+  const raw = v / 4, mag = 10 ** Math.floor(Math.log10(raw)), f = raw / mag;
+  const step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * mag;
+  return { max: Math.ceil(v / step) * step, step };
+}
+const ICON = {
+  money: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-1.6 3.2C17.3 7.6 20 11.6 20 15.5 20 19.4 16.8 21 12 21s-8-1.6-8-5.5c0-3.9 2.7-7.9 6.6-9.3z" fill="currentColor"/><text x="12" y="17.6" text-anchor="middle" font-size="9.5" font-weight="700" font-family="Arial,sans-serif" fill="var(--kc)">$</text></svg>',
+  car: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 13.2 5.8 8a2.4 2.4 0 0 1 2.3-1.6h7.8A2.4 2.4 0 0 1 18.2 8L20 13.2V19a1 1 0 0 1-1 1h-1.5a1 1 0 0 1-1-1v-1.2h-9V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zm2.3-.4h11.4L16.4 8.8a.9.9 0 0 0-.9-.6h-7a.9.9 0 0 0-.9.6zM7.3 16a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6zm9.4 0a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6z"/></svg>',
+  cc: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 3h9a1 1 0 0 1 1 1v5h4a1 1 0 0 1 1 1v11H4V4a1 1 0 0 1 1-1zm2 3v2h2V6zm4 0v2h2V6zm-4 4v2h2v-2zm4 0v2h2v-2zm-4 4v2h2v-2zm4 0v2h2v-2zm5-3v2h2v-2zm0 4v2h2v-2z"/></svg>',
+  check: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor"/><path d="m7.6 12.3 3 3 5.8-6.1" fill="none" stroke="var(--kc)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  warn: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.5 22.5 20.5h-21z"/><path d="M12 9v5.2" stroke="var(--kc)" stroke-width="2.3" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1.3" fill="var(--kc)"/></svg>',
+  cal: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2zM5 9v10h14V9zm2 2h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2zm-8 4h2v2H7zm4 0h2v2h-2z"/></svg>',
+  eye: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4.5c4.2 0 7.3 3.6 8.3 5.5-1 1.9-4.1 5.5-8.3 5.5S2.7 11.9 1.7 10C2.7 8.1 5.8 4.5 10 4.5zm0 2.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" fill="currentColor"/></svg>',
+  chev: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7.5 4.5 5.5 5.5-5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  a_warn: '<svg viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor" d="M10 1.8 19 17.6H1z"/><path d="M10 7.3v4.6" stroke="var(--ac-bg)" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="14.4" r="1.1" fill="var(--ac-bg)"/></svg>',
+  a_bad: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.5" fill="currentColor"/><path d="m6.8 6.8 6.4 6.4m0-6.4-6.4 6.4" stroke="var(--ac-bg)" stroke-width="2" stroke-linecap="round"/></svg>',
+  a_ok: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.5" fill="currentColor"/><path d="m6.2 10.3 2.5 2.5 5-5.3" fill="none" stroke="var(--ac-bg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  a_info: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.5" fill="currentColor"/><path d="M10 9v5" stroke="var(--ac-bg)" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="6.2" r="1.15" fill="var(--ac-bg)"/></svg>'
+};
+
+function dashData() {
+  const p = P(), n = rows.length, F = totFact(p), T = rows.reduce((a, r) => a + r.total, 0);
+  const sin = rows.filter(r => !r.cc).length;
+  const val = rows.filter(r => ccHabilitado(r.cc)).length;
+  const inc = n - sin - val;
+  // Centros de costo ordenados por monto; desde el octavo se agrupan en «Otros»
+  const g = groupByCC(), con = g.filter(x => x.cc).sort((a, b) => b.total - a.total), MAXN = 7;
+  const items = con.slice(0, con.length > MAXN + 1 ? MAXN : con.length).map((x, i) => ({ key: x.cc, label: ccLabel(x.cc), total: x.total, color: `var(--s${i + 1})`, bad: !ccHabilitado(x.cc) }));
+  if (con.length > MAXN + 1) {
+    const rest = con.slice(MAXN);
+    items.push({ key: "__otros", label: `Otros ${rest.length} CC`, total: rest.reduce((a, x) => a + x.total, 0), color: "var(--s8)" });
+  }
+  const none = g.find(x => !x.cc);
+  if (none) items.push({ key: "__none", label: "Sin centro de costo", total: none.total, color: "var(--warn)", none: true });
+  return { p, n, F, T, sin, val, inc, items, ccUsados: con.length, nuevas: rows.filter(r => r.nuevo).length, sinZona: rows.filter(r => !r.zona).length };
+}
+function donut(segs, size, stroke, center) {
+  const r = (size - stroke) / 2, C = 2 * Math.PI * r, tot = segs.reduce((a, s) => a + s.v, 0);
+  let off = 0;
+  const arcs = !tot ? `<circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--barbg)" stroke-width="${stroke}"/>`
+    : segs.filter(s => s.v > 0).map(s => {
+      const len = s.v / tot * C, gap = segs.filter(x => x.v > 0).length > 1 ? Math.min(1.5, len / 3) : 0;
+      const el = `<circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" style="stroke:${s.color}" stroke-width="${stroke}" stroke-dasharray="${(len - gap).toFixed(2)} ${(C - len + gap).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 ${size / 2} ${size / 2})"><title>${esc(s.title || "")}</title></circle>`;
+      off += len; return el;
+    }).join("");
+  return `<div class="donut" style="--ds:${size}px"><svg viewBox="0 0 ${size} ${size}" role="img" aria-label="${esc(center.aria)}">${arcs}</svg><div class="dc"><b>${center.v}</b><span>${center.l}</span></div></div>`;
+}
+function renderDash() {
+  const p = P(); if (!p) return;
+  const d = dashData();
+  $("d-per").textContent = `${perLabel(p)} · Factura ${p.id}`;
+
+  // Vigencia: días que faltan (o si ya venció / todavía no empezó)
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const desde = fecha(p.vigencia_desde), hasta = fecha(p.vigencia_hasta), DIA = 864e5;
+  let vig = { v: "—", l: "Vigencia", s: "Sin fechas en la póliza" };
+  if (desde && hasta) {
+    const total = Math.round((hasta - desde) / DIA) + 1;
+    if (hoy < desde) vig = { v: `${Math.round((desde - hoy) / DIA)} días`, l: "Para el inicio", s: `Vigencia ${fechaAr(desde)} al ${fechaAr(hasta)}` };
+    else if (hoy > hasta) vig = { v: "Vencida", l: "Vigencia", s: `Venció el ${fechaAr(hasta)} · ${total} días` };
+    else { const f = Math.round((hasta - hoy) / DIA); vig = { v: `${f} ${f === 1 ? "día" : "días"}`, l: "Restan de vigencia", s: `Vence el ${fechaAr(hasta)} · ${total} días en total` }; }
+  }
+  const pend = d.sin + d.inc;
+  const kpi = (cls, icon, v, l, s, go) => `<${go ? `button type="button" data-go="${go}"` : "div"} class="kpi ${cls}"><span class="ki">${ICON[icon]}</span><div><div class="kv" title="${String(v).replace(/<[^>]*>/g, "")}">${v}</div><div class="kl">${l}</div><div class="ks">${s}</div></div>${go ? `<span class="kgo" aria-hidden="true">${ICON.chev}</span>` : ""}</${go ? "button" : "div"}>`;
+  $("d-kpis").innerHTML =
+    kpi("k-money", "money", fmt0(d.F), "Costo total", "Total de la factura") +
+    kpi("k-car", "car", fmtInt(d.n), "Vehículos asegurados", d.nuevas ? `${d.nuevas} ${d.nuevas === 1 ? "nuevo" : "nuevos"} en este período` : `Póliza ${esc(p.poliza || "")}`) +
+    kpi("k-cc", "cc", fmtInt(d.ccUsados), "Centros de costo", `con vehículos · ${fmtInt(ccOn.length)} habilitados`, "cc") +
+    kpi("k-check", "check", pct1(d.n ? d.val / d.n : 0), "Patentes asignadas", `${fmtInt(d.val)} de ${fmtInt(d.n)} con CC habilitado`) +
+    kpi("k-warn" + (pend ? " pend" : ""), "warn", fmtInt(pend), "Sin asignación", pend ? [d.sin && `${d.sin} sin CC`, d.inc && `${d.inc} con CC no habilitado`].filter(Boolean).join(" · ") : "Todas tienen CC", pend ? (d.sin ? "none" : "bad") : "") +
+    kpi("k-cal", "cal", vig.v, vig.l, vig.s);
+
+  // Barras: costo por centro de costo
+  const max = Math.max(...d.items.map(x => x.total), 0), ax = niceMax(max);
+  const ticks = []; for (let t = 0; t <= ax.max + 1e-9; t += ax.step) ticks.push(t);
+  $("d-bars").innerHTML = !d.items.length ? `<p class="dempty">El período no tiene patentes.</p>` :
+    `<div class="bars">${d.items.map(x => `<button type="button" class="brow${x.none ? " none" : ""}${x.bad ? " bad" : ""}" data-cc="${esc(x.key)}" title="Ver ${esc(x.label)} en Totales por CC">
+        <span class="bl">${esc(x.label)}${x.bad ? `<small>${ccMap.has(x.key) ? "inhabilitado" : "no existe en la base"}</small>` : ""}</span>
+        <span class="bt"><i style="--w:${(x.total / ax.max).toFixed(4)};background:${x.color}"></i><em>${fmt0(x.total)}</em></span>
+        <span class="bp">${pct1(d.T ? x.total / d.T : 0)}</span></button>`).join("")}
+      <div class="baxis" aria-hidden="true"><span></span><span class="bt">${ticks.map(t => `<b style="--w:${(t / ax.max).toFixed(4)}">${t ? fmtAxis(t) : "0"}</b>`).join("")}</span><span></span></div></div>`;
+
+  // Anillo: participación
+  $("d-donut").innerHTML = !d.items.length ? `<p class="dempty">El período no tiene patentes.</p>` :
+    `<div class="dsplit">${donut(d.items.map(x => ({ v: x.total, color: x.color, title: `${x.label}: ${fmt0(x.total)}` })), 190, 40, { v: fmtM(d.T), l: "Total", aria: `Participación por centro de costo, total ${fmt0(d.T)}` })}
+      <ul class="legend">${d.items.map(x => `<li><i style="background:${x.color}"></i><span>${esc(x.label)}</span><b>${pct1(d.T ? x.total / d.T : 0)}</b></li>`).join("")}</ul></div>`;
+
+  // Estado de patentes
+  const pct = d.n ? d.val / d.n : 0;
+  $("d-estado").innerHTML = `<div class="dsplit sm">${donut([
+      { v: d.val, color: "var(--ok)", title: `Asignadas: ${d.val}` },
+      { v: d.sin, color: "var(--warn)", title: `Sin asignación: ${d.sin}` },
+      { v: d.inc, color: "var(--bad)", title: `Con CC no habilitado: ${d.inc}` }], 150, 22,
+      { v: pct1(pct), l: "Asignadas", aria: `${fmtPct(pct)} de las patentes asignadas` })}
+    <ul class="legend counts">
+      <li><i style="background:var(--ok)"></i><span>Asignadas</span><b>${fmtInt(d.val)}</b></li>
+      <li><i style="background:var(--warn)"></i><span>Sin asignación</span><b>${fmtInt(d.sin)}</b></li>
+      <li><i style="background:var(--bad)"></i><span>Con CC no habilitado</span><b>${fmtInt(d.inc)}</b></li>
+    </ul></div>
+    ${pend ? `<button type="button" class="dnote warn" data-go="${d.sin ? "none" : "bad"}">${ICON.a_warn}<span>${pend === 1 ? "1 patente necesita" : `${pend} patentes necesitan`} un centro de costo habilitado</span>${ICON.chev}</button>`
+      : `<div class="dnote ok">${ICON.a_ok}<span>Todas las patentes tienen un centro de costo habilitado</span></div>`}`;
+
+  // Últimos períodos, del más reciente al más antiguo, con la variación contra el anterior
+  const pers = S.periodos.slice().sort((a, b) => String(b.vigencia_desde || b.creado_en).localeCompare(String(a.vigencia_desde || a.creado_en)));
+  const shown = S.dashAll ? pers : pers.slice(0, 3);
+  $("d-pers").innerHTML = `<div class="ptable"><table><thead><tr><th>Período</th><th class="num">Costo total</th><th class="num">Var. vs. anterior</th><th class="pa"><span class="vh">Ver</span></th></tr></thead><tbody>
+    ${shown.map(x => {
+      const i = pers.indexOf(x), prev = pers[i + 1], t = totFact(x), v = prev ? t / totFact(prev) - 1 : null, cur = x.id === S.actual;
+      const vt = v == null ? `<span class="var">—</span>` : `<span class="var ${v > 0.0005 ? "up" : v < -0.0005 ? "down" : ""}">${v > 0 ? "+" : ""}${(v * 100).toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%</span>`;
+      return `<tr class="${cur ? "cur" : ""}"><td data-l="Período"><b>${esc(perLabel(x))}</b><small>Fact. ${esc(x.id)}</small></td><td class="num" data-l="Costo total">${fmt0(t)}</td><td class="num" data-l="Var. vs. anterior">${vt}</td>
+        <td class="pa">${cur ? `<span class="pcur">Actual</span>` : `<button type="button" class="peye" data-per="${esc(x.id)}" aria-label="Ver el período ${esc(perLabel(x))}" title="Ver este período">${ICON.eye}</button>`}</td></tr>`;
+    }).join("")}</tbody></table></div>
+    ${pers.length > 3 ? `<button type="button" class="dlink" id="d-hist">${S.dashAll ? "Ver solo los últimos 3" : `Ver historial completo (${pers.length})`}</button>` : ""}
+    <p class="dfoot">La variación compara el total facturado con el período anterior.</p>`;
+
+  // Alertas y novedades, armadas con el estado real del período
+  const al = [];
+  if (d.sin) al.push(["warn", `${d.sin} ${d.sin === 1 ? "patente" : "patentes"} sin asignación`, "Asignar el centro de costo que corresponde", "none"]);
+  if (d.inc) al.push(["bad", `${d.inc} ${d.inc === 1 ? "patente" : "patentes"} con CC no habilitado`, "Reasignar a un centro de costo habilitado", "bad"]);
+  const dif = Math.round((d.T - d.F) * 100) / 100;
+  al.push(Math.abs(dif) < 0.005 ? ["ok", "El prorrateo cuadra con la factura", `Total distribuido ${fmt0(d.F)}, al centavo`, ""]
+    : ["bad", "Diferencia entre factura y prorrateo", `$ ${fmt(Math.abs(dif))} (${fmtPct(d.F ? Math.abs(dif) / d.F : 0)})`, ""]);
+  if (d.nuevas) al.push(["info", `${d.nuevas} ${d.nuevas === 1 ? "patente nueva" : "patentes nuevas"} en este período`, "No estaban en el período anterior", "new"]);
+  if (d.sinZona && Object.keys(S.zonas).length) al.push(["info", `${d.sinZona} ${d.sinZona === 1 ? "patente" : "patentes"} sin zona`, "Actualizar la base de zonas", "zona"]);
+  const bc = S.bases.centros_costo;
+  if (bc) al.push(["info", `Base de CC: ${fmtInt(ccOn.length)} habilitados de ${fmtInt(S.ccBase.length)}`, bc.cargado_en ? `Actualizada el ${fechaAr(new Date(bc.cargado_en))}` : esc(bc.archivo || ""), ""]);
+  if (p.creado_en) al.push(["ok", `Período ${perLabel(p)} cargado correctamente`, `Factura ${p.id} · ${fechaAr(new Date(p.creado_en))}`, ""]);
+  $("d-alerts").innerHTML = `<ul class="alerts">${al.map(([t, h, s, go]) => {
+    const inner = `<span class="ai">${ICON["a_" + t]}</span><span class="at"><b>${esc(h)}</b><small>${esc(s)}</small></span>${go ? ICON.chev : ""}`;
+    return `<li class="al ${t}">${go ? `<button type="button" data-go="${go}">${inner}</button>` : `<div>${inner}</div>`}</li>`;
+  }).join("")}</ul>`;
+}
+function goPat(go) {
+  S.q = ""; $("q").value = ""; S.sel.clear(); S.zf = ""; S.fil = "all";
+  if (go === "zona") S.zf = "__none"; else S.fil = go;
+  setView("pat"); renderPat(); scrollTo(0, 0);
+}
+$("dashview").addEventListener("click", e => {
+  const go = e.target.closest("[data-go]");
+  if (go) { if (go.dataset.go === "cc") { setView("cc"); scrollTo(0, 0); } else goPat(go.dataset.go); return; }
+  const b = e.target.closest(".brow");
+  if (b) { const k = b.dataset.cc; if (k !== "__otros") S.open.add(k); setView("cc"); renderCC(); scrollTo(0, 0); return; }
+  const pe = e.target.closest(".peye");
+  if (pe) { S.actual = pe.dataset.per; localStorage.setItem("seg-periodo", S.actual); S.sel.clear(); S.open.clear(); reload({ soloPeriodo: true }); scrollTo(0, 0); return; }
+  if (e.target.closest("#d-hist")) { S.dashAll = !S.dashAll; renderDash(); }
+});
 
 /* ================= Menú de CC (estilo autofiltro de Excel) =================
    Buscador arriba, lista con casilleros y Aceptar / Cancelar abajo. Solo
@@ -707,7 +880,7 @@ $("save").addEventListener("click", async () => {
     });
     S.actual = res.id; localStorage.setItem("seg-periodo", S.actual);
     S.up = { poliza: null, factura: null, cc: null, zona: null };
-    showUpload(false); S.open.clear(); setView("cc");
+    showUpload(false); S.open.clear(); setView("dash");
     await reload();
     const pend = res.vehiculos - res.con_cc;
     toast(pend ? `Período guardado. ${pend} patentes necesitan CC.` : "Período guardado. Todas las patentes tienen CC.");
