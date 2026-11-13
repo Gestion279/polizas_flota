@@ -164,7 +164,7 @@ function renderAll() {
 function renderInvoice(p) {
   $("i-num").textContent = "Factura " + p.id;
   renderPdfBtn(p);
-  $("i-dl").innerHTML = `<dt>Fecha</dt><dd>${esc(isoToAr(p.factura_fecha))}</dd><dt>Detalle</dt><dd>${esc(p.factura_detalle || "")}</dd>`;
+  $("i-dl").innerHTML = `<dt>Fecha</dt><dd>${esc(isoToAr(p.factura_fecha))}</dd><dt>Detalle</dt><dd title="${esc(p.factura_detalle || "")}">${esc(p.factura_detalle || "")}</dd>`;
   const T = +p.neto + +p.iva + +p.percepcion + +p.otros_impuestos;
   const cuadra = Math.abs(rows.reduce((a, r) => a + r.total, 0) - T) < 0.005;
   $("i-amts").innerHTML = [
@@ -689,9 +689,17 @@ const fromB64 = b => { const bin = atob(String(b).replace(/\s/g, "")); const u8 
 const fmtKB = n => n >= 1048576 ? (n / 1048576).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
 
 async function loadPdfInfo() {
-  // null = la migración del PDF todavía no está en la base
+  // S.pdfs = null si la consulta falla; S.pdfErr guarda el motivo para mostrarlo
   const { data, error } = await sb.rpc("seg_facturas_pdf_info");
+  S.pdfErr = error || null;
   S.pdfs = error ? null : Object.fromEntries((data || []).map(x => [x.periodo_id, x]));
+}
+function pdfErrHtml(e) {
+  const msg = errMsg(e), falta = e && (e.code === "PGRST202" || e.code === "42883" || e.code === "42P01" || /could not find the function|schema cache/i.test(msg));
+  return falta
+    ? `<b>Falta preparar la base de datos</b><p>Supabase todavía no ve las funciones del PDF. Ejecutá en el SQL Editor la migración <code>20261114120000_factura_pdf.sql</code>; al final tiene que listar cinco funciones. Después tocá «Reintentar».</p>
+       <p class="pdfv-code">${esc(e.code || "")} ${esc(msg)}</p><button type="button" class="btn primary" id="pdfv-retry">Reintentar</button>`
+    : `<b>No se pudo consultar el PDF</b><p>La base respondió con este error:</p><p class="pdfv-code">${esc(e?.code || "")} ${esc(msg)}</p><button type="button" class="btn primary" id="pdfv-retry">Reintentar</button>`;
 }
 async function guardarFacturaPdf(id, file) {
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -731,8 +739,16 @@ async function openPdf(e) {
   $("pdfv-s").textContent = [isoToAr(p.factura_fecha), info?.archivo, info?.bytes && fmtKB(info.bytes)].filter(Boolean).join(" · ");
   $("pdfv").hidden = false; document.body.classList.add("pdfv-on");
   $("pdfv-x").focus();
-  if (S.pdfs === null) return pdfMsg(`<b>Falta preparar la base de datos</b><p>Para guardar y ver el PDF de las facturas, ejecutá en Supabase la migración <code>20261114120000_factura_pdf.sql</code>.</p>`);
-  if (!info) return pdfSinArchivo(p);
+  if (S.pdfs === null) {
+    // Se vuelve a consultar por si la migración se ejecutó después de abrir la app
+    pdfMsg(`<span class="pdfv-spin" aria-hidden="true"></span><b>Consultando la base…</b>`);
+    await loadPdfInfo(); renderPdfBtn(p);
+    if (tok !== PV.token) return;
+    if (S.pdfs === null) return pdfMsg(pdfErrHtml(S.pdfErr));
+  }
+  const info2 = S.pdfs[p.id];
+  if (info2 && !info) $("pdfv-s").textContent = [isoToAr(p.factura_fecha), info2.archivo, info2.bytes && fmtKB(info2.bytes)].filter(Boolean).join(" · ");
+  if (!info2) return pdfSinArchivo(p);
   pdfMsg(`<span class="pdfv-spin" aria-hidden="true"></span><b>Abriendo la factura…</b>`);
   try {
     let bytes = pdfCache.get(p.id);
@@ -743,7 +759,7 @@ async function openPdf(e) {
       bytes = fromB64(r.contenido); pdfCache.set(p.id, bytes);
     }
     if (tok !== PV.token) return;
-    await showPdf(bytes, info.archivo || `Factura_${p.id}.pdf`, tok);
+    await showPdf(bytes, info2.archivo || `Factura_${p.id}.pdf`, tok);
   } catch (e) { if (tok === PV.token) pdfMsg(`<b>No se pudo abrir el PDF</b><p>${esc(errMsg(e))}</p>`); }
 }
 async function showPdf(bytes, archivo, tok) {
@@ -802,7 +818,10 @@ document.addEventListener("keydown", e => {
 const zoom = k => { PV.zoom = Math.min(3, Math.max(0.5, PV.zoom * k)); renderPages(PV.token); };
 $("pdfv-zp").addEventListener("click", () => zoom(1.25));
 $("pdfv-zm").addEventListener("click", () => zoom(0.8));
-$("pdfv-body").addEventListener("click", e => { if (e.target.closest("#pdfv-up")) $("pdfv-file").click(); });
+$("pdfv-body").addEventListener("click", e => {
+  if (e.target.closest("#pdfv-up")) $("pdfv-file").click();
+  if (e.target.closest("#pdfv-retry")) { const from = PV.from; openPdf({ currentTarget: from }); }
+});
 $("pdfv-file").addEventListener("change", async e => {
   const f = e.target.files[0]; e.target.value = ""; if (!f) return;
   const p = P(); if (!p || p.id !== PV.id) return;
