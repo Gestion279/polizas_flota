@@ -68,10 +68,11 @@ const S = {
   bases: {},              // tipo -> {archivo, filas, detalle, cargado_en}
   zonas: {},              // patente -> zona
   asignadas: new Set(),   // patentes con CC recordado
-  view: "cc", q: "", fil: "all", zf: "", showOff: false, sel: new Set(), sort: { k: "cert", dir: 1 }, open: new Set(),
+  view: "cc", q: "", fil: "all", zf: "", bulkCC: "", sel: new Set(), sort: { k: "cert", dir: 1 }, open: new Set(),
   up: { poliza: null, factura: null, cc: null, zona: null }
 };
 let ccMap = new Map();
+let ccOn = [];            // CC habilitados, ordenados por código: los únicos que se pueden asignar
 let rows = [];
 const P = () => S.periodos.find(p => p.id === S.actual) || null;
 
@@ -117,14 +118,11 @@ async function reload(opts = {}) {
 /* ================= CC ================= */
 function buildCC() {
   ccMap = new Map(S.ccBase.map(c => [c.codigo, { d: c.descripcion, on: c.habilitado }]));
-  const dl = $("cclist"); dl.innerHTML = "";
-  const frag = document.createDocumentFragment();
-  for (const [code, c] of ccMap) {
-    if (!c.on && !S.showOff) continue;
-    const o = document.createElement("option"); o.value = code + " · " + c.d + (c.on ? "" : " (inhabilitado)"); frag.appendChild(o);
-  }
-  dl.appendChild(frag);
+  ccOn = S.ccBase.filter(c => c.habilitado)
+    .map(c => ({ code: c.codigo, d: c.descripcion || "", key: normH(c.codigo + " " + (c.descripcion || "")) }))
+    .sort((a, b) => a.code.localeCompare(b.code, "es", { numeric: true }));
 }
+const ccHabilitado = code => !!(code && ccMap.get(code)?.on);
 function codeFrom(val) {
   val = String(val || "").trim(); if (!val) return "";
   const code = val.split(/\s+·\s+|\s{2,}/)[0].trim();
@@ -262,7 +260,7 @@ function renderPat() {
       <td class="pat"><span class="plate"><span>${esc(r.patente)}</span></span>${r.nuevo ? '<span class="new">Nueva</span>' : ""}</td>
       <td class="marca">${esc(r.marca)}<small>${esc(r.anio)}</small></td>
       <td class="zn">${r.zona ? `<span class="zona">${esc(r.zona)}</span>` : `<span class="zona none">Sin zona</span>`}</td>
-      <td class="ccc"><div class="cc ${st.cls}"><input class="ccin" list="cclist" value="${esc(r.cc)}" placeholder="Elegí o escribí el CC" aria-label="Centro de costo de ${esc(r.patente)}"><small title="${esc(st.txt)}">${esc(st.txt)}</small></div></td>
+      <td class="ccc"><div class="cc ${st.cls}"><button type="button" class="ccbtn${r.cc ? "" : " empty"}" aria-haspopup="dialog" aria-expanded="false" aria-label="Centro de costo de ${esc(r.patente)}: ${esc(r.cc ? r.cc + ", " + st.txt : "sin asignar")}"><span class="v">${r.cc ? esc(r.cc) : "Elegir CC"}</span><span class="arr" aria-hidden="true"></span></button><small title="${esc(st.txt)}">${esc(st.txt)}</small></div></td>
       <td class="num" data-l="Premio">${fmt(r.base)}</td><td class="num" data-l="%">${fmtPct(r.pct)}</td>
       <td class="num" data-l="Neto">${fmt(r.neto)}</td><td class="num" data-l="IVA">${fmt(r.iva)}</td><td class="num" data-l="Perc. IVA">${fmt(r.perc)}</td><td class="num" data-l="Otros imp.">${fmt(r.otros)}</td>
       <td class="num tot" data-l="Total">${fmt(r.total)}</td></tr>`;
@@ -287,6 +285,7 @@ function refreshViews() { const y = scrollY; renderProgress(); renderCC(); rende
 /* ================= Asignación ================= */
 async function assign(pats, code) {
   const p = P(); if (!p || !pats.length) return false;
+  if (code && !ccHabilitado(code)) { toast(ccMap.has(code) ? `El CC ${code} está inhabilitado; elegí uno habilitado.` : `El CC ${code} no está en la base.`); return false; }
   const prev = new Map(rows.filter(r => pats.includes(r.patente)).map(r => [r.patente, { cc: r.cc, nuevo: r.nuevo }]));
   rows.forEach(r => { if (prev.has(r.patente)) { r.cc = code; r.nuevo = false; } });
   refreshViews();
@@ -301,25 +300,49 @@ async function assign(pats, code) {
 }
 $("tb").addEventListener("change", e => {
   const tr = e.target.closest("tr"); if (!tr) return; const pt = tr.dataset.p;
-  if (e.target.classList.contains("rs")) { e.target.checked ? S.sel.add(pt) : S.sel.delete(pt); tr.classList.toggle("sel", e.target.checked); syncBulk(); return; }
-  if (e.target.classList.contains("ccin")) assign([pt], codeFrom(e.target.value));
+  if (e.target.classList.contains("rs")) { e.target.checked ? S.sel.add(pt) : S.sel.delete(pt); tr.classList.toggle("sel", e.target.checked); syncBulk(); }
 });
+const rowBtn = pt => $("tb").querySelector(`tr[data-p="${CSS.escape(pt)}"] .ccbtn`);
+function pickRow(btn) {
+  const pt = btn.closest("tr").dataset.p, r = rows.find(x => x.patente === pt); if (!r) return;
+  openPicker(btn, {
+    title: "Centro de costo de " + pt, cur: r.cc, allowNone: true,
+    onPick: async code => { if (code !== r.cc) await assign([pt], code); },
+    refocus: () => rowBtn(pt)
+  });
+}
+$("tb").addEventListener("click", e => { const b = e.target.closest(".ccbtn"); if (b) pickRow(b); });
+$("tb").addEventListener("keydown", e => { const b = e.target.closest(".ccbtn"); if (b && (e.key === "ArrowDown" || e.key === "F4")) { e.preventDefault(); pickRow(b); } });
 function syncBulk() {
   const n = S.sel.size; $("bulk").classList.toggle("on", n > 0); document.body.classList.toggle("bulk-on", n > 0); setBulkH(); $("bulk-n").textContent = n === 1 ? "1 seleccionada" : `${n} seleccionadas`;
   const vis = [...$("tb").querySelectorAll("tr[data-p]")].map(t => t.dataset.p), all = $("all");
   all.checked = vis.length > 0 && vis.every(p => S.sel.has(p)); all.indeterminate = !all.checked && vis.some(p => S.sel.has(p));
 }
 $("all").addEventListener("change", e => { [...$("tb").querySelectorAll("tr[data-p]")].forEach(t => e.target.checked ? S.sel.add(t.dataset.p) : S.sel.delete(t.dataset.p)); renderPat(); });
+function renderBulkCC() {
+  const b = $("bulk-cc"), c = ccMap.get(S.bulkCC);
+  b.classList.toggle("empty", !S.bulkCC);
+  b.querySelector(".v").innerHTML = S.bulkCC ? `${esc(S.bulkCC)}<em>${esc(c ? c.d : "")}</em>` : "Centro de costo para todas";
+  b.setAttribute("aria-label", "Centro de costo para las seleccionadas: " + (S.bulkCC ? S.bulkCC + (c ? ", " + c.d : "") : "sin elegir"));
+}
+function pickBulk() {
+  openPicker($("bulk-cc"), {
+    title: S.sel.size === 1 ? "Centro de costo para 1 patente" : `Centro de costo para ${S.sel.size} patentes`, cur: S.bulkCC, allowNone: false,
+    onPick: code => { S.bulkCC = code; renderBulkCC(); },
+    refocus: () => $("bulk-ok")
+  });
+}
+$("bulk-cc").addEventListener("click", pickBulk);
+$("bulk-cc").addEventListener("keydown", e => { if (e.key === "ArrowDown" || e.key === "F4") { e.preventDefault(); pickBulk(); } });
 $("bulk-ok").addEventListener("click", async () => {
-  const code = codeFrom($("bulk-cc").value);
-  if (!code) return toast("Elegí un centro de costo para asignar.");
-  if (!ccMap.has(code)) return toast(`El CC ${code} no está en la base.`);
+  const code = S.bulkCC;
+  if (!code) { toast("Elegí un centro de costo para asignar."); return pickBulk(); }
   const pats = [...S.sel], btn = $("bulk-ok"); busy(btn, true);
-  if (await assign(pats, code)) { toast(`CC ${code} asignado a ${pats.length} patentes.`); S.sel.clear(); $("bulk-cc").value = ""; refreshViews(); }
+  if (await assign(pats, code)) { toast(`CC ${code} asignado a ${pats.length} patentes.`); S.sel.clear(); S.bulkCC = ""; renderBulkCC(); refreshViews(); }
   busy(btn, false);
 });
 $("bulk-clear").addEventListener("click", async () => { const pats = [...S.sel]; if (await assign(pats, "")) { S.sel.clear(); refreshViews(); } });
-$("bulk-x").addEventListener("click", () => { S.sel.clear(); renderPat(); });
+$("bulk-x").addEventListener("click", () => { S.sel.clear(); S.bulkCC = ""; renderBulkCC(); renderPat(); });
 document.querySelectorAll("#patview th[data-sort]").forEach(th => {
   th.tabIndex = 0;
   const go = () => { const k = th.dataset.sort; S.sort = { k, dir: S.sort.k === k ? -S.sort.dir : 1 }; renderPat(); };
@@ -331,7 +354,6 @@ $("q").addEventListener("input", e => { S.q = e.target.value; renderPat(); });
 $("fil").addEventListener("change", e => { S.fil = e.target.value; S.sel.clear(); renderPat(); });
 $("fclear").addEventListener("click", () => { S.fil = "all"; S.zf = ""; S.q = ""; $("q").value = ""; S.sel.clear(); renderPat(); });
 $("zf").addEventListener("change", e => { S.zf = e.target.value; S.sel.clear(); renderPat(); });
-$("showoff").addEventListener("change", e => { S.showOff = e.target.checked; buildCC(); });
 $("t-cc").addEventListener("click", () => setView("cc"));
 $("t-pat").addEventListener("click", () => setView("pat"));
 function toggleCC(row) { const k = row.dataset.k; S.open.has(k) ? S.open.delete(k) : S.open.add(k); renderCC(); }
@@ -342,6 +364,139 @@ $("ccb").addEventListener("click", e => {
 $("ccb").addEventListener("keydown", e => { const row = e.target.closest(".ccrow"); if (row && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggleCC(row); } });
 $("asig").addEventListener("click", () => { S.fil = "none"; S.zf = ""; S.q = ""; $("q").value = ""; S.sel.clear(); setView("pat"); renderPat(); });
 $("per").addEventListener("change", async e => { S.actual = e.target.value; localStorage.setItem("seg-periodo", S.actual); S.sel.clear(); S.open.clear(); await reload({ soloPeriodo: true }); });
+
+/* ================= Menú de CC (estilo autofiltro de Excel) =================
+   Buscador arriba, lista con casilleros y Aceptar / Cancelar abajo. Solo
+   ofrece CC habilitados. Un vehículo lleva un solo CC: tildar uno destilda
+   el anterior. Teclado: ↑ ↓ recorren la lista, Espacio tilda, Enter acepta,
+   Esc cancela. Doble clic en una opción la tilda y acepta. */
+const PK = { open: false, btn: null, opt: null, items: [], chk: null, act: -1 };
+const pop = $("ccpop"), popQ = $("ccpop-q"), popL = $("ccpop-l");
+const mobile = () => matchMedia("(max-width:760px)").matches;
+
+function hl(text, terms) {
+  // Resalta los términos sin distinguir mayúsculas ni tildes
+  if (!terms.length) return esc(text);
+  let norm = "", map = [];
+  [...text].forEach((ch, i) => { const n = normH(ch) || ch.toLowerCase(); for (const _ of n) map.push(i); norm += n; });
+  const chars = [...text], mark = new Array(chars.length).fill(false);
+  for (const t of terms) for (let k = norm.indexOf(t); k >= 0; k = norm.indexOf(t, k + 1)) for (let j = k; j < k + t.length; j++) mark[map[j]] = true;
+  let out = "", on = false;
+  chars.forEach((ch, i) => { if (mark[i] !== on) { out += mark[i] ? "<mark>" : "</mark>"; on = mark[i]; } out += esc(ch); });
+  return out + (on ? "</mark>" : "");
+}
+function pickList() {
+  const terms = normH(popQ.value).split(/\s+/).filter(Boolean);
+  const found = terms.length ? ccOn.filter(c => terms.every(t => c.key.includes(t))) : ccOn;
+  PK.items = (PK.opt.allowNone && !terms.length ? [{ code: "", d: "Quitar el centro de costo", none: true }] : []).concat(found);
+  if (PK.act >= PK.items.length) PK.act = PK.items.length - 1;
+  popL.innerHTML = !PK.items.length
+    ? `<div class="ccpop-empty">Ningún CC habilitado coincide con «${esc(popQ.value.trim())}».</div>`
+    : PK.items.map((c, i) => `<div class="ccopt${c.none ? " none" : ""}${c.code === PK.chk ? " on" : ""}${i === PK.act ? " act" : ""}" role="option" id="ccopt-${i}" data-i="${i}" aria-selected="${c.code === PK.chk}">
+        <span class="box" aria-hidden="true"></span>${c.none ? `<span class="code">(Sin CC)</span><span class="d">${esc(c.d)}</span>` : `<span class="code">${hl(c.code, terms)}</span><span class="d">${hl(c.d, terms)}</span>`}</div>`).join("");
+  popQ.setAttribute("aria-activedescendant", PK.act >= 0 ? "ccopt-" + PK.act : "");
+  const n = found.length;
+  $("ccpop-n").textContent = terms.length ? `${fmtInt(n)} de ${fmtInt(ccOn.length)} CC habilitados` : `${fmtInt(ccOn.length)} CC habilitados`;
+  $("ccpop-ok").disabled = PK.chk === null;
+}
+function pickActive(i, scroll = true) {
+  PK.act = i;
+  popL.querySelectorAll(".ccopt").forEach(el => el.classList.toggle("act", +el.dataset.i === i));
+  popQ.setAttribute("aria-activedescendant", i >= 0 ? "ccopt-" + i : "");
+  if (scroll && i >= 0) popL.querySelector(`[data-i="${i}"]`)?.scrollIntoView({ block: "nearest" });
+}
+function pickCheck(i) {
+  const c = PK.items[i]; if (!c) return;
+  PK.chk = PK.chk === c.code ? null : c.code;   // tildar de nuevo lo destilda, como en Excel
+  popL.querySelectorAll(".ccopt").forEach(el => { const on = PK.items[+el.dataset.i].code === PK.chk; el.classList.toggle("on", on); el.setAttribute("aria-selected", on); });
+  $("ccpop-ok").disabled = PK.chk === null;
+  pickActive(i, false);
+}
+function placePicker() {
+  if (!PK.open) return;
+  pop.classList.toggle("sheet", mobile()); $("ccpop-bg").hidden = !mobile();
+  if (mobile()) { pop.style.cssText = ""; return; }
+  const r = PK.btn.getBoundingClientRect();
+  if (!PK.btn.isConnected || r.bottom < 0 || r.top > innerHeight) return closePicker(false);
+  const w = Math.min(Math.max(r.width, 360), innerWidth - 16);
+  const below = innerHeight - r.bottom - 12, above = r.top - 12, up = below < 280 && above > below;
+  const maxH = Math.min(440, up ? above : below);
+  pop.style.width = w + "px";
+  pop.style.maxHeight = Math.max(maxH, 200) + "px";
+  pop.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + "px";
+  pop.style.top = up ? "" : r.bottom + 4 + "px";
+  pop.style.bottom = up ? innerHeight - r.top + 4 + "px" : "";
+}
+function openPicker(btn, opt) {
+  if (PK.open && PK.btn === btn) return closePicker();   // segundo clic en el mismo botón: cierra
+  if (PK.open) closePicker(false);
+  if (!ccOn.length) return toast("No hay centros de costo habilitados en la base. Subí la base de CC con la columna «Habilitado».");
+  Object.assign(PK, { open: true, btn, opt, chk: !opt.cur && opt.allowNone ? "" : ccHabilitado(opt.cur) ? opt.cur : null, act: -1 });
+  $("ccpop-t").textContent = opt.title;
+  const w = $("ccpop-warn");
+  w.hidden = !opt.cur || ccHabilitado(opt.cur);
+  if (!w.hidden) w.textContent = ccMap.has(opt.cur) ? `El CC actual (${opt.cur}) está inhabilitado. Elegí uno habilitado.` : `El CC actual (${opt.cur}) no existe en la base. Elegí uno habilitado.`;
+  popQ.value = "";
+  pop.hidden = false; btn.setAttribute("aria-expanded", "true");
+  pickList();
+  const i = PK.chk === null ? -1 : PK.items.findIndex(c => c.code === PK.chk);
+  pickActive(i >= 0 ? i : (PK.items.length ? 0 : -1));
+  placePicker();
+  popQ.focus({ preventScroll: true });
+}
+function closePicker(refocus = true) {
+  if (!PK.open) return;
+  PK.open = false; pop.hidden = true; $("ccpop-bg").hidden = true;
+  PK.btn?.setAttribute("aria-expanded", "false");
+  if (refocus) (PK.opt.refocus?.() || (PK.btn.isConnected ? PK.btn : null))?.focus({ preventScroll: true });
+}
+async function acceptPicker() {
+  if (!PK.open || PK.chk === null) return;
+  const code = PK.chk, opt = PK.opt;
+  closePicker(false);
+  const done = opt.onPick(code);
+  (opt.refocus?.())?.focus({ preventScroll: true });
+  await done;
+}
+
+popQ.addEventListener("input", () => { PK.act = -1; pickList(); pickActive(PK.items.length ? 0 : -1); });
+popQ.addEventListener("keydown", e => {
+  const n = PK.items.length;
+  if (e.key === "ArrowDown") { e.preventDefault(); if (n) pickActive(Math.min(n - 1, PK.act + 1)); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); if (n) pickActive(Math.max(0, PK.act - 1)); }
+  else if (e.key === "Home" && e.ctrlKey) { e.preventDefault(); if (n) pickActive(0); }
+  else if (e.key === "End" && e.ctrlKey) { e.preventDefault(); if (n) pickActive(n - 1); }
+  else if (e.key === "PageDown") { e.preventDefault(); if (n) pickActive(Math.min(n - 1, PK.act + 8)); }
+  else if (e.key === "PageUp") { e.preventDefault(); if (n) pickActive(Math.max(0, PK.act - 8)); }
+  else if (e.key === " " && !popQ.value.endsWith(" ") && PK.act >= 0 && (e.ctrlKey || !popQ.value)) { e.preventDefault(); pickCheck(PK.act); }
+  else if (e.key === "Enter") {
+    e.preventDefault();
+    // Enter tilda la opción marcada (o la única que quedó) y acepta
+    const solo = PK.items.filter(c => !c.none);
+    if (PK.act >= 0) { PK.chk = PK.items[PK.act].code; }
+    else if (solo.length === 1) { PK.chk = solo[0].code; }
+    acceptPicker();
+  }
+});
+pop.addEventListener("keydown", e => {
+  if (e.key === "Escape") { e.preventDefault(); closePicker(); }
+  else if (e.key === "Tab") {
+    // El foco queda dentro del menú mientras está abierto
+    const f = [popQ, $("ccpop-ok"), $("ccpop-no"), $("ccpop-x")].filter(x => !x.disabled);
+    const i = f.indexOf(document.activeElement);
+    e.preventDefault(); f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus();
+  }
+});
+popL.addEventListener("mousedown", e => e.preventDefault());   // el foco sigue en el buscador
+popL.addEventListener("click", e => { const o = e.target.closest(".ccopt"); if (o) pickCheck(+o.dataset.i); });
+popL.addEventListener("dblclick", e => { const o = e.target.closest(".ccopt"); if (o) { PK.chk = PK.items[+o.dataset.i].code; acceptPicker(); } });
+$("ccpop-ok").addEventListener("click", acceptPicker);
+$("ccpop-no").addEventListener("click", () => closePicker());
+$("ccpop-x").addEventListener("click", () => closePicker());
+$("ccpop-bg").addEventListener("click", () => closePicker());
+document.addEventListener("mousedown", e => { if (PK.open && !pop.contains(e.target) && !PK.btn.contains(e.target)) closePicker(false); });
+addEventListener("scroll", placePicker, { capture: true, passive: true });
+addEventListener("resize", placePicker);
 
 /* ================= Excel: lectura ================= */
 async function readSheet(file) { const wb = XLSX.read(await file.arrayBuffer(), { type: "array" }); return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: false }); }
@@ -356,11 +511,16 @@ $("impf").addEventListener("change", async e => {
     if (hi < 0) return toast("No encontré columnas «Patente» y «CC» en la primera hoja.");
     const h = aoa[hi], ip = h.findIndex(c => normH(c) === "patente"), ic = h.findIndex(isCCHeader);
     const known = new Set(rows.map(r => r.patente)); const by = {};
-    let skip = 0;
-    for (const r of aoa.slice(hi + 1)) { const pt = normPat(r[ip]), c = codeFrom(r[ic]); if (!pt) continue; if (known.has(pt) && c) (by[c] = by[c] || []).push(pt); else skip++; }
+    let skip = 0; const off = new Set();
+    for (const r of aoa.slice(hi + 1)) {
+      const pt = normPat(r[ip]), c = codeFrom(r[ic]); if (!pt) continue;
+      if (!known.has(pt) || !c) { skip++; continue; }
+      if (!ccHabilitado(c)) { off.add(c); skip++; continue; }
+      (by[c] = by[c] || []).push(pt);
+    }
     let ok = 0;
     for (const [c, ps] of Object.entries(by)) if (await assign(ps, c)) ok += ps.length;
-    toast(`Importadas ${ok} asignaciones` + (skip ? `; ${skip} filas sin patente de la póliza o sin CC.` : "."));
+    toast(`Importadas ${ok} asignaciones` + (skip ? `; ${skip} filas omitidas (patente fuera de la póliza, sin CC o CC no habilitado${off.size ? ": " + [...off].slice(0, 6).join(", ") + (off.size > 6 ? "…" : "") : ""}).` : "."));
   } catch (err) { toast("No se pudo leer el archivo. Usá un .xlsx con columnas Patente y CC."); }
 });
 
@@ -483,9 +643,13 @@ async function loadCC(f) {
   try {
     const aoa = await readSheet(f), hi = aoa.findIndex(r => r.some(c => normH(c) === "cc"));
     if (hi < 0) { slot("cc", "Error", "bad", f.name, "No encontré la columna «CC» en la primera hoja."); return; }
-    const h = aoa[hi].map(normH), ic = h.indexOf("cc"), id = h.findIndex(c => c.startsWith("descrip")), ih = h.findIndex(c => c.startsWith("habilit"));
+    const h = aoa[hi].map(normH), ic = h.indexOf("cc"), id = h.findIndex(c => c.startsWith("descrip"));
+    // «Habilitado» va en la columna C; si el título no está, se toma esa columna.
+    let ih = h.findIndex(c => c.startsWith("habilit"));
+    if (ih < 0 && ic !== 2 && id !== 2 && aoa[hi].length > 2) ih = 2;
+    if (ih < 0) { slot("cc", "Error", "bad", f.name, "No encontré la columna «Habilitado» (columna C)."); return; }
     const list = aoa.slice(hi + 1).filter(r => String(r[ic]).trim()).map(r => {
-      const hv = ih < 0 ? "verdadero" : normH(r[ih]);
+      const hv = normH(r[ih]);
       return { codigo: String(r[ic]).trim(), descripcion: id < 0 ? "" : String(r[id]).trim(), habilitado: ["verdadero", "true", "si", "1", "x", "yes"].includes(hv) };
     });
     if (!list.length) { slot("cc", "Error", "bad", f.name, "La hoja no tiene centros de costo."); return; }
