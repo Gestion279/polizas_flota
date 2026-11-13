@@ -14,7 +14,7 @@ Cada semestre se suben la póliza (PDF), la factura (PDF) y, si cambiaron, la ba
 
 ### 1. Supabase
 
-1. En el proyecto, abrí **SQL Editor**, pegá el contenido completo de `supabase/migrations/20261112120000_seguros_cc.sql` y ejecutalo. Crea las tablas, las vistas y las funciones. Después ejecutá `supabase/migrations/20261112150000_prorrateo_solo_premio.sql`, que fija el prorrateo por premio, y `supabase/migrations/20261113120000_cc_solo_habilitados.sql`, que impide guardar asignaciones con CC inhabilitados. Los dos se pueden ejecutar más de una vez sin perder datos. Si usás la CLI, alcanza con `supabase db push`.
+1. En el proyecto, abrí **SQL Editor**, pegá el contenido completo de `supabase/migrations/20261112120000_seguros_cc.sql` y ejecutalo. Crea las tablas, las vistas y las funciones. Después ejecutá `supabase/migrations/20261112150000_prorrateo_solo_premio.sql`, que fija el prorrateo por premio, y `supabase/migrations/20261113120000_cc_solo_habilitados.sql`, que impide guardar asignaciones con CC inhabilitados. Los tres se pueden ejecutar más de una vez sin perder datos. Si usás la CLI, alcanza con `supabase db push`.
 2. Ejecutá `supabase/usuarios.sql` para cargar los correos habilitados.
    - Para agregar a alguien, sumá una línea en ese archivo y volvé a ejecutarlo.
    - Para dar de baja a alguien: `update public.seg_usuarios set activo = false where email = 'correo@fabricasrl.com.ar';`
@@ -54,15 +54,23 @@ Requiere Node 22.12 o superior.
    - **Base de CC** (Excel con columnas `CC`, `Descripción` y `Habilitado` en la columna C). Solo los CC con `VERDADERO` en «Habilitado» se pueden asignar.
    - **Zonas** (Excel con columnas `Patente`, `Zona`), opcional.
 3. Revisá los controles (cantidad de certificados, total de factura contra premio final de la póliza, patentes sin zona) y guardá.
-4. En **Totales por CC** está el monto por centro de costo. Si tocás un CC, se ven sus patentes.
-5. En **Patentes y asignación** se asigna el CC: fila por fila, o en bloque filtrando por zona y seleccionando todas. El botón con la flecha abre un menú como el autofiltro de Excel: un buscador por código o nombre (sin importar mayúsculas ni tildes), la lista de CC habilitados con un casillero cada uno, y **Aceptar** / **Cancelar**. Con el teclado: ↓ o F4 abre el menú, ↑ ↓ recorren la lista, Enter acepta la opción marcada y Esc cancela. Si una patente tiene un CC que quedó inhabilitado, se marca en amarillo y el menú pide elegir otro. También se puede importar un Excel con columnas `Patente` y `CC`; las filas con CC inhabilitados se omiten y se informan.
-6. **Exportar a Excel** genera tres hojas: totales por CC, detalle por patente y datos de la factura.
+4. El **Dashboard** es la primera pestaña y resume el período visible con los datos guardados:
+   - Indicadores: costo total de la factura, vehículos asegurados, centros de costo con vehículos, porcentaje de patentes con CC habilitado, patentes sin asignación y días de vigencia que quedan.
+   - Costo y participación por centro de costo (barras y anillo). Muestra los siete CC de mayor monto; el resto se agrupa en «Otros». Si tocás una barra, se abre ese CC en **Totales por CC**.
+   - Estado de patentes, últimos períodos con la variación del total facturado contra el período anterior (el ojo abre ese período), y alertas: patentes sin CC o con CC inhabilitado, diferencia entre factura y prorrateo, patentes nuevas o sin zona, y la última carga de la base de CC. Las alertas con flecha llevan a las patentes correspondientes.
+5. En **Totales por CC** está el monto por centro de costo. Si tocás un CC, se ven sus patentes.
+6. En **Patentes y asignación** se asigna el CC: fila por fila, o en bloque filtrando por zona y seleccionando todas. El botón con la flecha abre un menú como el autofiltro de Excel: un buscador por código o nombre (sin importar mayúsculas ni tildes), la lista de CC habilitados con un casillero cada uno, y **Aceptar** / **Cancelar**. Con el teclado: ↓ o F4 abre el menú, ↑ ↓ recorren la lista, Enter acepta la opción marcada y Esc cancela. Si una patente tiene un CC que quedó inhabilitado, se marca en naranja y el menú pide elegir otro. También se puede importar un Excel con columnas `Patente` y `CC`; las filas con CC inhabilitados se omiten y se informan.
+7. **Exportar a Excel** genera tres hojas: totales por CC, detalle por patente y datos de la factura.
 
 El prorrateo se hace por **valor del vehículo** por defecto. Se puede cambiar a **premio del certificado** con el selector. Cada concepto se reparte al centavo con el método del mayor resto, así cada columna suma exactamente lo facturado.
 
 ## Íconos
 
 Los íconos están en `public/`: `favicon.ico` y `favicon.svg` (escudo simplificado, legible en la pestaña), `icon.svg` (vehículo con escudo), `apple-touch-icon.png`, `icon-192.png`, `icon-512.png` e `icon-maskable-512.png` para Android. `manifest.webmanifest` permite instalar la app en el celular o el escritorio. Los colores son los del logo de la empresa: azul `#0A4088` y rojo `#BA1212`.
+
+## Colores
+
+La paleta está definida una sola vez en las variables de `:root` al comienzo de `src/style.css`, con una versión para modo claro y otra para modo oscuro, y la usan todas las pantallas en escritorio y celular. El verde azulado oscuro `#1E4952` se usa en títulos y encabezados de tarjetas, y el verde azulado `#1D7A70` en botones y enlaces. Los gráficos usan la serie `--s1` a `--s8`: `#2A9D8F`, `#264653`, `#8AB17D`, `#E9A23B`, `#E76F51`, `#9DB4C0`, `#5E8C6A` y `#B07AA1`. Verde, naranja y rojo indican estado: correcto, pendiente y error.
 
 ## Modelo de datos
 

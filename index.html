@@ -8,7 +8,7 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#0A4088">
+<meta name="theme-color" content="#1E4952">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
@@ -35,7 +35,8 @@
       <h1 class="brand"><img src="/icon.svg" alt="" width="44" height="44">Pólizas flota vehicular</h1>
       <p class="sub" id="hsub">Cargá la póliza, la factura y la base de CC para ver cuánto le toca a cada centro de costo.</p>
       <div class="tabs" role="tablist" id="tabs" hidden>
-        <button role="tab" id="t-cc" aria-selected="true" type="button">Totales por CC</button>
+        <button role="tab" id="t-dash" aria-selected="true" type="button">Dashboard</button>
+        <button role="tab" id="t-cc" aria-selected="false" type="button">Totales<span class="t-long"> por CC</span></button>
         <button role="tab" id="t-pat" aria-selected="false" type="button">Patentes<span class="t-long"> y asignación</span> <span class="cnt" id="t-cnt" hidden></span></button>
       </div>
     </div>
@@ -86,8 +87,23 @@
   <!-- MAIN -->
   <div id="main" hidden>
 
-    <section class="panel">
-      <div id="ccview">
+    <!-- DASHBOARD -->
+    <section class="dash" id="dashview" aria-labelledby="d-title">
+      <h2 class="dash-title" id="d-title"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="3" width="10" height="3" rx="1"/><rect x="2" y="8.5" width="15" height="3" rx="1"/><rect x="2" y="14" width="7" height="3" rx="1"/></svg>Resumen general<span id="d-per"></span></h2>
+      <div class="kpis" id="d-kpis"></div>
+      <div class="dgrid g2">
+        <article class="dcard"><h3><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="3" width="10" height="3" rx="1"/><rect x="2" y="8.5" width="15" height="3" rx="1"/><rect x="2" y="14" width="7" height="3" rx="1"/></svg>Costo por centro de costo</h3><div class="dbody" id="d-bars"></div></article>
+        <article class="dcard"><h3><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M9 3a7 7 0 1 0 7 7H9z"/><path d="M11 1.2a7.8 7.8 0 0 1 7.8 7.8H11z"/></svg>Participación por centro de costo</h3><div class="dbody" id="d-donut"></div></article>
+      </div>
+      <div class="dgrid g3">
+        <article class="dcard"><h3><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 11l1.6-4.4A2 2 0 0 1 6.5 5.3h7a2 2 0 0 1 1.9 1.3L17 11v4.5a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H6v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></svg>Estado de patentes</h3><div class="dbody" id="d-estado"></div></article>
+        <article class="dcard"><h3><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 2h12a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm2 4v2h8V6zm0 4v2h8v-2zm0 4v1.5h5V14z"/></svg>Últimos períodos</h3><div class="dbody" id="d-pers"></div></article>
+        <article class="dcard"><h3><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.5 19 17.5H1z"/></svg>Alertas y novedades</h3><div class="dbody" id="d-alerts"></div></article>
+      </div>
+    </section>
+
+    <section class="panel" id="tblpanel">
+      <div id="ccview" hidden>
         <div class="tablewrap"><table>
           <thead><tr><th>Centro de costo</th><th>Descripción</th><th>Participación</th><th class="num">Patentes</th><th class="num">Neto</th><th class="num">IVA</th><th class="num">Perc. IVA</th><th class="num">Otros imp.</th><th class="num">Total</th></tr></thead>
           <tbody id="ccb"></tbody>
