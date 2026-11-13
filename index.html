@@ -48,6 +48,7 @@
     </div>
   <section class="panel invoice" id="invoice" aria-label="Factura" hidden>
     <div class="inv-id">
+      <button type="button" class="pdfbtn" id="i-pdf" title="Ver el PDF de la factura" aria-label="Ver el PDF de la factura"><img src="/factura-pdf.png" alt="" width="40" height="40"><span class="pdfdot" hidden></span></button>
       <div class="n" id="i-num"></div>
       <dl id="i-dl"></dl>
     </div>
@@ -89,7 +90,7 @@
 
     <!-- DASHBOARD -->
     <section class="dash" id="dashview" aria-labelledby="d-title">
-      <h2 class="dash-title" id="d-title"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="3" width="10" height="3" rx="1"/><rect x="2" y="8.5" width="15" height="3" rx="1"/><rect x="2" y="14" width="7" height="3" rx="1"/></svg>Resumen general<span id="d-per"></span></h2>
+      <h2 class="dash-title" id="d-title"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="3" width="10" height="3" rx="1"/><rect x="2" y="8.5" width="15" height="3" rx="1"/><rect x="2" y="14" width="7" height="3" rx="1"/></svg>Resumen general<span id="d-per"></span><button type="button" class="pdfbtn" id="d-pdf"><img src="/factura-pdf.png" alt="" width="28" height="28"><span class="pdfdot" hidden></span>Ver factura</button></h2>
       <div class="kpis" id="d-kpis"></div>
       <div class="dgrid g2">
         <article class="dcard"><h3><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="3" width="10" height="3" rx="1"/><rect x="2" y="8.5" width="15" height="3" rx="1"/><rect x="2" y="14" width="7" height="3" rx="1"/></svg>Costo por centro de costo</h3><div class="dbody" id="d-bars"></div></article>
@@ -168,6 +169,24 @@
   <div class="ccpop-n" id="ccpop-n" aria-live="polite"></div>
   <div class="ccpop-f"><button type="button" class="btn primary" id="ccpop-ok">Aceptar</button><button type="button" class="btn" id="ccpop-no">Cancelar</button></div>
 </div>
+<!-- Visor del PDF de la factura -->
+<div class="pdfv" id="pdfv" role="dialog" aria-modal="true" aria-labelledby="pdfv-t" hidden>
+  <div class="pdfv-box">
+    <div class="pdfv-h">
+      <img src="/factura-pdf.png" alt="" width="30" height="30">
+      <div class="pdfv-tt"><b id="pdfv-t">Factura</b><small id="pdfv-s"></small></div>
+      <div class="pdfv-act">
+        <button type="button" class="btn" id="pdfv-zm" aria-label="Reducir">−</button>
+        <button type="button" class="btn" id="pdfv-zp" aria-label="Ampliar">+</button>
+        <a class="btn" id="pdfv-open" target="_blank" rel="noopener" hidden>Abrir en otra pestaña</a>
+        <a class="btn primary" id="pdfv-dl" hidden>Descargar</a>
+        <button type="button" class="pdfv-x" id="pdfv-x" aria-label="Cerrar">×</button>
+      </div>
+    </div>
+    <div class="pdfv-body" id="pdfv-body" tabindex="0"></div>
+  </div>
+</div>
+<input type="file" id="pdfv-file" accept=".pdf,application/pdf" hidden>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script type="module" src="/src/main.js"></script>
 </body>

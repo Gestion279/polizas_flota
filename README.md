@@ -14,7 +14,7 @@ Cada semestre se suben la póliza (PDF), la factura (PDF) y, si cambiaron, la ba
 
 ### 1. Supabase
 
-1. En el proyecto, abrí **SQL Editor**, pegá el contenido completo de `supabase/migrations/20261112120000_seguros_cc.sql` y ejecutalo. Crea las tablas, las vistas y las funciones. Después ejecutá `supabase/migrations/20261112150000_prorrateo_solo_premio.sql`, que fija el prorrateo por premio, y `supabase/migrations/20261113120000_cc_solo_habilitados.sql`, que impide guardar asignaciones con CC inhabilitados. Los tres se pueden ejecutar más de una vez sin perder datos. Si usás la CLI, alcanza con `supabase db push`.
+1. En el proyecto, abrí **SQL Editor**, pegá el contenido completo de `supabase/migrations/20261112120000_seguros_cc.sql` y ejecutalo. Crea las tablas, las vistas y las funciones. Después ejecutá `supabase/migrations/20261112150000_prorrateo_solo_premio.sql`, que fija el prorrateo por premio, `supabase/migrations/20261113120000_cc_solo_habilitados.sql`, que impide guardar asignaciones con CC inhabilitados, y `supabase/migrations/20261114120000_factura_pdf.sql`, que guarda el PDF de cada factura. Todos se pueden ejecutar más de una vez sin perder datos. Si usás la CLI, alcanza con `supabase db push`.
 2. Ejecutá `supabase/usuarios.sql` para cargar los correos habilitados.
    - Para agregar a alguien, sumá una línea en ese archivo y volvé a ejecutarlo.
    - Para dar de baja a alguien: `update public.seg_usuarios set activo = false where email = 'correo@fabricasrl.com.ar';`
@@ -58,9 +58,10 @@ Requiere Node 22.12 o superior.
    - Indicadores: costo total de la factura, vehículos asegurados, centros de costo con vehículos, porcentaje de patentes con CC habilitado, patentes sin asignación y días de vigencia que quedan.
    - Costo y participación por centro de costo (barras y anillo). Aparecen todos los CC del período, ordenados por monto, con el nombre completo y el importe al centavo, para cargar el prorrateo en Bejerman. La leyenda del anillo cierra con el total. Si tocás una barra, se abre ese CC en **Totales por CC**.
    - Estado de patentes, últimos períodos con la variación del total facturado contra el período anterior (el ojo abre ese período), y alertas: patentes sin CC o con CC inhabilitado, diferencia entre factura y prorrateo, patentes nuevas o sin zona, y la última carga de la base de CC. Las alertas con flecha llevan a las patentes correspondientes.
-5. En **Totales por CC** está el monto por centro de costo. Si tocás un CC, se ven sus patentes.
-6. En **Patentes y asignación** se asigna el CC: fila por fila, o en bloque filtrando por zona y seleccionando todas. El botón con la flecha abre un menú como el autofiltro de Excel: un buscador por código o nombre (sin importar mayúsculas ni tildes), la lista de CC habilitados con un casillero cada uno, y **Aceptar** / **Cancelar**. Con el teclado: ↓ o F4 abre el menú, ↑ ↓ recorren la lista, Enter acepta la opción marcada y Esc cancela. Si una patente tiene un CC que quedó inhabilitado, se marca en naranja y el menú pide elegir otro. También se puede importar un Excel con columnas `Patente` y `CC`; las filas con CC inhabilitados se omiten y se informan.
-7. **Exportar a Excel** genera tres hojas: totales por CC, detalle por patente y datos de la factura.
+5. El ícono de la lupa con el PDF, arriba a la derecha de la tarjeta de la factura (y «Ver factura» en el Dashboard), abre el PDF de la factura en un visor con zoom, para descargar o abrir en otra pestaña. El PDF se guarda al cargar el período. Si el período se cargó antes, el ícono muestra un «+» y permite subirlo; la app controla que sea la misma factura antes de guardarlo.
+6. En **Totales por CC** está el monto por centro de costo. Si tocás un CC, se ven sus patentes.
+7. En **Patentes y asignación** se asigna el CC: fila por fila, o en bloque filtrando por zona y seleccionando todas. El botón con la flecha abre un menú como el autofiltro de Excel: un buscador por código o nombre (sin importar mayúsculas ni tildes), la lista de CC habilitados con un casillero cada uno, y **Aceptar** / **Cancelar**. Con el teclado: ↓ o F4 abre el menú, ↑ ↓ recorren la lista, Enter acepta la opción marcada y Esc cancela. Si una patente tiene un CC que quedó inhabilitado, se marca en naranja y el menú pide elegir otro. También se puede importar un Excel con columnas `Patente` y `CC`; las filas con CC inhabilitados se omiten y se informan.
+8. **Exportar a Excel** genera tres hojas: totales por CC, detalle por patente y datos de la factura.
 
 El prorrateo se hace por **valor del vehículo** por defecto. Se puede cambiar a **premio del certificado** con el selector. Cada concepto se reparte al centavo con el método del mayor resto, así cada columna suma exactamente lo facturado.
 
@@ -82,6 +83,7 @@ La paleta está definida una sola vez en las variables de `:root` al comienzo de
 | `seg_asignaciones` | Último CC conocido por patente; precarga los períodos nuevos. |
 | `seg_bases` | Archivo y fecha de la última carga de cada base. |
 | `seg_periodos` | Un registro por factura: póliza, vigencia e importes. |
+| `seg_facturas_pdf` | PDF de la factura de cada período. Solo se lee y se guarda con `seg_factura_pdf` y `seg_guardar_factura_pdf`. |
 | `seg_periodo_vehiculos` | Vehículos del período con su CC. |
 | `seg_v_prorrateo` | Vista con el prorrateo por patente (neto, IVA, percepción, otros, total). |
 | `seg_v_totales_cc` | Vista con los totales por período y CC, incluidas las zonas. |
