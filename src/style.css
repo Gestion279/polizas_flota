@@ -674,3 +674,75 @@ button.kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .peye{width:40px;height:36px}
   .brow{min-height:44px}
 }
+
+/* ==========================================================================
+   PDF de la factura: botón en la tarjeta y visor
+   ========================================================================== */
+.inv-id{position:relative}
+.inv-id .n{padding-right:46px}
+.pdfbtn{all:unset;box-sizing:border-box;position:absolute;top:8px;right:8px;width:44px;height:44px;display:grid;place-items:center;border-radius:9px;cursor:pointer;transition:background .15s}
+.pdfbtn img{width:40px;height:40px;display:block;transition:transform .15s}
+.pdfbtn:hover{background:var(--row-hover)}
+.pdfbtn:hover img{transform:scale(1.06)}
+.pdfbtn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.pdfdot{position:absolute;right:3px;bottom:3px;width:15px;height:15px;border-radius:50%;background:var(--warn);color:#fff;font:700 13px/15px var(--sans);text-align:center;box-shadow:0 0 0 2px var(--surface)}
+.pdfdot::before{content:"+"}
+@media (min-width:1200px){
+  .pdfbtn{top:4px;right:4px;width:34px;height:34px}
+  .pdfbtn img{width:30px;height:30px}
+  .pdfdot{width:13px;height:13px;font-size:11.5px;line-height:13px;right:1px;bottom:1px}
+  .inv-id .n{padding-right:30px}
+  .invoice{grid-template-columns:minmax(222px,1.6fr) minmax(130px,1fr) repeat(4,minmax(0,1fr)) minmax(0,1.2fr)}
+}
+@media (min-width:1200px) and (max-width:1439px){
+  .invoice{grid-template-columns:minmax(206px,1.5fr) minmax(120px,1fr) repeat(4,minmax(0,1fr)) minmax(0,1.2fr)}
+}
+/* El mismo acceso junto al título del Dashboard, donde la tarjeta de la factura no se muestra */
+.dash-title .pdfbtn{position:relative;top:auto;right:auto;margin-left:auto;display:flex;gap:8px;width:auto;height:auto;padding:4px 10px 4px 6px;border:1px solid var(--line);background:var(--surface);font:600 13px var(--sans);color:var(--ink)}
+.dash-title .pdfbtn img{width:28px;height:28px}
+.dash-title .pdfbtn:hover{background:var(--row-hover)}
+.dash-title .pdfbtn .pdfdot{left:24px;right:auto;bottom:1px;width:13px;height:13px;font-size:11.5px;line-height:13px}
+@media (max-width:760px){.dash-title .pdfbtn{margin-left:0}}
+@media (prefers-reduced-motion:reduce){.pdfbtn,.pdfbtn img{transition:none}}
+
+.pdfv{position:fixed;inset:0;z-index:40;background:rgba(8,18,20,.6);display:flex;align-items:center;justify-content:center;padding:24px}
+.pdfv-box{display:flex;flex-direction:column;width:min(980px,100%);height:100%;max-height:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 20px 50px -10px rgba(0,0,0,.5)}
+.pdfv-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px 10px 14px;background:var(--head);color:var(--on-head)}
+.pdfv-h>img{flex:none;background:#fff;border-radius:7px;padding:2px}
+.pdfv-tt{flex:1 1 200px;min-width:0}
+.pdfv-tt b{display:block;font:600 17px var(--cond)}
+.pdfv-tt small{display:block;font-size:12px;opacity:.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pdfv-act{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pdfv-act .btn{padding:6px 12px;text-decoration:none;background:transparent;color:var(--on-head);border-color:color-mix(in srgb,var(--on-head) 35%,transparent)}
+.pdfv-act .btn:hover{background:color-mix(in srgb,var(--on-head) 12%,transparent)}
+.pdfv-act .btn.primary{background:var(--on-head);color:var(--head);border-color:var(--on-head)}
+.pdfv-act .btn.primary:hover{filter:brightness(.94)}
+#pdfv-zm,#pdfv-zp{width:34px;padding:6px 0;font-size:17px;line-height:1}
+.pdfv-act .btn:focus-visible,.pdfv-x:focus-visible{outline:2px solid var(--on-head);outline-offset:2px}
+.pdfv-x{all:unset;width:34px;height:34px;display:grid;place-items:center;border-radius:7px;font-size:24px;line-height:1;cursor:pointer;color:var(--on-head)}
+.pdfv-x:hover{background:color-mix(in srgb,var(--on-head) 14%,transparent)}
+.pdfv-body{flex:1;overflow:auto;background:color-mix(in srgb,var(--ink) 10%,var(--paper));padding:16px;display:flex;flex-direction:column;align-items:flex-start;gap:14px;overscroll-behavior:contain}
+.pdfv-body:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.pdfv-body canvas{display:block;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.25);flex:none;max-width:none;margin:0 auto}
+.pdfv-msg{margin:auto;max-width:420px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;color:var(--ink)}
+.pdfv-msg b{font:600 18px var(--cond)}
+.pdfv-msg p{margin:0;color:var(--muted)}
+.pdfv-msg code{font-size:12.5px;background:var(--barbg);padding:1px 5px;border-radius:4px}
+.pdfv-spin{width:30px;height:30px;border-radius:50%;border:3px solid var(--barbg);border-top-color:var(--accent);animation:pdfspin .8s linear infinite}
+@keyframes pdfspin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.pdfv-spin{animation-duration:2.4s}}
+body.pdfv-on{overflow:hidden}
+
+/* Celular: el visor ocupa toda la pantalla */
+@media (max-width:760px){
+  .pdfv{padding:0}
+  .pdfv-box{border-radius:0;border:0;padding-top:env(safe-area-inset-top,0px);background:var(--head)}
+  .pdfv-h{padding:8px 10px 10px}
+  .pdfv-act{width:100%}
+  .pdfv-act .btn{flex:1 1 auto;text-align:center}
+  #pdfv-zm,#pdfv-zp{flex:none}
+  .pdfv-x{position:absolute;top:calc(env(safe-area-inset-top,0px) + 8px);right:8px}
+  .pdfv-tt{padding-right:40px}
+  .pdfv-body{padding:10px 8px calc(10px + env(safe-area-inset-bottom,0px));background:color-mix(in srgb,var(--ink) 10%,var(--paper))}
+}
+@media (pointer:coarse){.pdfv-act .btn{min-height:40px} .pdfv-x{width:40px;height:40px}}

@@ -69,7 +69,8 @@ const S = {
   zonas: {},              // patente -> zona
   asignadas: new Set(),   // patentes con CC recordado
   view: "dash", dashAll: false, q: "", fil: "all", zf: "", bulkCC: "", sel: new Set(), sort: { k: "cert", dir: 1 }, open: new Set(),
-  up: { poliza: null, factura: null, cc: null, zona: null }
+  up: { poliza: null, factura: null, cc: null, zona: null },
+  pdfs: {}                // periodo -> datos del PDF guardado de la factura (null si falta la migración)
 };
 let ccMap = new Map();
 let ccOn = [];            // CC habilitados, ordenados por código: los únicos que se pueden asignar
@@ -92,6 +93,7 @@ async function loadMaestros() {
   S.zonas = Object.fromEntries(zs.map(z => [z.patente, z.zona]));
   S.bases = Object.fromEntries(bases.data.map(b => [b.tipo, b]));
   S.asignadas = new Set(asig.map(a => a.patente));
+  await loadPdfInfo();
   const saved = localStorage.getItem("seg-periodo");
   if (!S.periodos.some(p => p.id === S.actual)) S.actual = S.periodos.some(p => p.id === saved) ? saved : (S.periodos[0]?.id || null);
   buildCC();
@@ -161,6 +163,7 @@ function renderAll() {
 }
 function renderInvoice(p) {
   $("i-num").textContent = "Factura " + p.id;
+  renderPdfBtn(p);
   $("i-dl").innerHTML = `<dt>Fecha</dt><dd>${esc(isoToAr(p.factura_fecha))}</dd><dt>Detalle</dt><dd>${esc(p.factura_detalle || "")}</dd>`;
   const T = +p.neto + +p.iva + +p.percepcion + +p.otros_impuestos;
   const cuadra = Math.abs(rows.reduce((a, r) => a + r.total, 0) - T) < 0.005;
@@ -674,6 +677,162 @@ document.addEventListener("mousedown", e => { if (PK.open && !pop.contains(e.tar
 addEventListener("scroll", placePicker, { capture: true, passive: true });
 addEventListener("resize", placePicker);
 
+/* ================= PDF de la factura =================
+   El PDF se guarda en Supabase al cargar el período (seg_guardar_factura_pdf) y se
+   muestra en un visor propio con pdf.js, que se ve igual en escritorio y celular.
+   Si el período se cargó antes de guardar los PDF, el visor permite subirlo; se
+   controla que sea la misma factura antes de guardarlo. */
+const pdfCache = new Map();
+const PV = { url: "", bytes: null, zoom: 1, token: 0, id: "" };
+const toB64 = u8 => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+const fromB64 = b => { const bin = atob(String(b).replace(/\s/g, "")); const u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return u8; };
+const fmtKB = n => n >= 1048576 ? (n / 1048576).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
+
+async function loadPdfInfo() {
+  // null = la migración del PDF todavía no está en la base
+  const { data, error } = await sb.rpc("seg_facturas_pdf_info");
+  S.pdfs = error ? null : Object.fromEntries((data || []).map(x => [x.periodo_id, x]));
+}
+async function guardarFacturaPdf(id, file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (bytes.length > 10 * 1048576) throw new Error("el PDF supera los 10 MB");
+  await rpc("seg_guardar_factura_pdf", { p_periodo: id, p_archivo: file.name, p_pdf: toB64(bytes) });
+  if (S.pdfs) S.pdfs[id] = { periodo_id: id, archivo: file.name, bytes: bytes.length, cargado_en: new Date().toISOString() };
+  pdfCache.set(id, bytes);
+}
+function renderPdfBtn(p) {
+  const has = !!(S.pdfs && S.pdfs[p.id]);
+  const t = has ? `Ver el PDF de la factura ${p.id}` : `La factura ${p.id} no tiene el PDF guardado: tocá para subirlo`;
+  ["i-pdf", "d-pdf"].forEach(id => {
+    const b = $(id);
+    b.classList.toggle("missing", !has);
+    b.querySelector(".pdfdot").hidden = has;
+    b.title = t; b.setAttribute("aria-label", t);
+  });
+}
+function pdfMsg(html) { $("pdfv-body").innerHTML = `<div class="pdfv-msg">${html}</div>`; }
+function pdfClear() {
+  if (PV.url) URL.revokeObjectURL(PV.url);
+  Object.assign(PV, { url: "", bytes: null });
+  $("pdfv-dl").hidden = true; $("pdfv-open").hidden = true; $("pdfv-zm").hidden = true; $("pdfv-zp").hidden = true;
+}
+function pdfSinArchivo(p) {
+  pdfMsg(`<img src="/factura-pdf.png" alt="" width="72" height="72">
+    <b>Esta factura no tiene el PDF guardado</b>
+    <p>Se cargó antes de que la aplicación guardara los PDF. Subí el PDF de la factura ${esc(p.id)} y queda guardado para todos.</p>
+    <button type="button" class="btn primary" id="pdfv-up">Subir el PDF de la factura</button>`);
+}
+async function openPdf(e) {
+  const p = P(); if (!p) return;
+  PV.from = e?.currentTarget || $("i-pdf");
+  const tok = ++PV.token; PV.id = p.id; PV.zoom = 1; pdfClear();
+  const info = S.pdfs && S.pdfs[p.id];
+  $("pdfv-t").textContent = "Factura " + p.id;
+  $("pdfv-s").textContent = [isoToAr(p.factura_fecha), info?.archivo, info?.bytes && fmtKB(info.bytes)].filter(Boolean).join(" · ");
+  $("pdfv").hidden = false; document.body.classList.add("pdfv-on");
+  $("pdfv-x").focus();
+  if (S.pdfs === null) return pdfMsg(`<b>Falta preparar la base de datos</b><p>Para guardar y ver el PDF de las facturas, ejecutá en Supabase la migración <code>20261114120000_factura_pdf.sql</code>.</p>`);
+  if (!info) return pdfSinArchivo(p);
+  pdfMsg(`<span class="pdfv-spin" aria-hidden="true"></span><b>Abriendo la factura…</b>`);
+  try {
+    let bytes = pdfCache.get(p.id);
+    if (!bytes) {
+      const r = await rpc("seg_factura_pdf", { p_periodo: p.id });
+      if (tok !== PV.token) return;
+      if (!r || !r.contenido) { delete S.pdfs[p.id]; renderPdfBtn(p); return pdfSinArchivo(p); }
+      bytes = fromB64(r.contenido); pdfCache.set(p.id, bytes);
+    }
+    if (tok !== PV.token) return;
+    await showPdf(bytes, info.archivo || `Factura_${p.id}.pdf`, tok);
+  } catch (e) { if (tok === PV.token) pdfMsg(`<b>No se pudo abrir el PDF</b><p>${esc(errMsg(e))}</p>`); }
+}
+async function showPdf(bytes, archivo, tok) {
+  PV.bytes = bytes;
+  PV.url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+  const dl = $("pdfv-dl"); dl.href = PV.url; dl.download = /\.pdf$/i.test(archivo) ? archivo : archivo + ".pdf"; dl.hidden = false;
+  $("pdfv-open").href = PV.url; $("pdfv-open").hidden = false;
+  $("pdfv-zm").hidden = false; $("pdfv-zp").hidden = false;
+  await renderPages(tok);
+}
+async function renderPages(tok) {
+  const body = $("pdfv-body");
+  try {
+    const { getDocument } = await loadPdfjs();
+    const doc = await getDocument({ data: PV.bytes.slice() }).promise;
+    if (tok !== PV.token) return;
+    const avail = Math.max(240, body.clientWidth - 32), dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const frag = document.createDocumentFragment();
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i);
+      const base = page.getViewport({ scale: 1 });
+      const scale = Math.min(avail / base.width, 2) * PV.zoom;
+      const vp = page.getViewport({ scale: scale * dpr });
+      const c = document.createElement("canvas");
+      c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+      c.style.width = Math.floor(vp.width / dpr) + "px"; c.style.height = Math.floor(vp.height / dpr) + "px";
+      c.setAttribute("role", "img"); c.setAttribute("aria-label", `Página ${i} de ${doc.numPages} de la factura`);
+      await page.render({ canvasContext: c.getContext("2d"), viewport: vp, canvas: c }).promise;
+      if (tok !== PV.token) return;
+      frag.appendChild(c);
+    }
+    body.innerHTML = ""; body.appendChild(frag);
+    $("pdfv-zm").disabled = PV.zoom <= 0.5; $("pdfv-zp").disabled = PV.zoom >= 3;
+  } catch (e) { if (tok === PV.token) pdfMsg(`<b>No se pudo mostrar el PDF</b><p>Probá con «Descargar». ${esc(errMsg(e))}</p>`); }
+}
+function closePdf() {
+  if ($("pdfv").hidden) return;
+  PV.token++; pdfClear();
+  $("pdfv").hidden = true; document.body.classList.remove("pdfv-on"); $("pdfv-body").innerHTML = "";
+  (PV.from && PV.from.offsetParent ? PV.from : $("i-pdf")).focus({ preventScroll: true });
+}
+$("i-pdf").addEventListener("click", openPdf);
+$("d-pdf").addEventListener("click", openPdf);
+$("pdfv-x").addEventListener("click", closePdf);
+$("pdfv").addEventListener("click", e => { if (e.target === $("pdfv")) closePdf(); });
+document.addEventListener("keydown", e => {
+  if ($("pdfv").hidden) return;
+  if (e.key === "Escape") { e.preventDefault(); closePdf(); }
+  else if (e.key === "Tab") {
+    // El foco queda dentro del visor
+    const f = [...$("pdfv").querySelectorAll("button,a[href],[tabindex='0']")].filter(x => !x.hidden && !x.disabled && x.offsetParent);
+    const i = f.indexOf(document.activeElement);
+    e.preventDefault(); f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length]?.focus();
+  }
+});
+const zoom = k => { PV.zoom = Math.min(3, Math.max(0.5, PV.zoom * k)); renderPages(PV.token); };
+$("pdfv-zp").addEventListener("click", () => zoom(1.25));
+$("pdfv-zm").addEventListener("click", () => zoom(0.8));
+$("pdfv-body").addEventListener("click", e => { if (e.target.closest("#pdfv-up")) $("pdfv-file").click(); });
+$("pdfv-file").addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  const p = P(); if (!p || p.id !== PV.id) return;
+  const tok = PV.token;
+  pdfMsg(`<span class="pdfv-spin" aria-hidden="true"></span><b>Revisando el PDF…</b>`);
+  try {
+    // Antes de guardarlo se controla que sea la factura de este período
+    const { getDocument } = await loadPdfjs();
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    const doc = await getDocument({ data: bytes.slice() }).promise;
+    const fa = parseFacturaLines(await pageText(doc, 1));
+    if (fa.numero !== p.id) {
+      if (tok === PV.token) pdfSinArchivo(p);
+      return toast(fa.numero ? `Ese PDF es la factura ${fa.numero}, no la ${p.id}.` : `«${f.name}» no parece ser la factura ${p.id}.`);
+    }
+    await guardarFacturaPdf(p.id, f);
+    renderPdfBtn(p);
+    if (tok !== PV.token) return;
+    $("pdfv-s").textContent = [isoToAr(p.factura_fecha), f.name, fmtKB(bytes.length)].filter(Boolean).join(" · ");
+    toast("PDF de la factura guardado.");
+    await showPdf(bytes, f.name, tok);
+    $("pdfv-body").focus({ preventScroll: true });
+  } catch (err) {
+    if (tok === PV.token) pdfSinArchivo(p);
+    toast("No se guardó el PDF: " + errMsg(err));
+  }
+});
+let pdfResizeT;
+addEventListener("resize", () => { if (!$("pdfv").hidden && PV.bytes) { clearTimeout(pdfResizeT); pdfResizeT = setTimeout(() => renderPages(PV.token), 200); } });
+
 /* ================= Excel: lectura ================= */
 async function readSheet(file) { const wb = XLSX.read(await file.arrayBuffer(), { type: "array" }); return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: false }); }
 const isCCHeader = c => ["cc", "centro de costo", "centro de costos"].includes(normH(c));
@@ -793,7 +952,7 @@ async function handleFiles(files) {
     if (kind === "factura") {
       const fa = parseFacturaLines(await pageText(pdf, 1));
       if (fa.neto == null || fa.total == null) { slot("factura", "Error", "bad", f.name, "No encontré los importes de la factura."); continue; }
-      S.up.factura = { archivo: f.name, ...fa };
+      S.up.factura = { archivo: f.name, file: f, ...fa };
       slot("factura", "Lista", "ok", f.name, `N° ${esc(fa.numero)} del ${esc(fa.fecha)}<br>Total $ ${fmt(fa.total)}`);
     } else {
       slot("poliza", "Leyendo", "busy", f.name, "Abriendo…"); const mini = $("s-poliza").querySelector(".mini"); mini.hidden = false;
@@ -882,11 +1041,15 @@ $("save").addEventListener("click", async () => {
       p_vehiculos: pol.vehiculos.map(v => ({ patente: v.patente, certificado: v.cert, marca: v.marca, anio: v.anio, valor: v.valor, premio: v.premio }))
     });
     S.actual = res.id; localStorage.setItem("seg-periodo", S.actual);
+    // El PDF de la factura se guarda aparte; si falla, el período ya quedó guardado
+    let pdfErr = "";
+    try { await guardarFacturaPdf(res.id, fa.file); } catch (e) { pdfErr = errMsg(e); }
     S.up = { poliza: null, factura: null, cc: null, zona: null };
     showUpload(false); S.open.clear(); setView("dash");
     await reload();
     const pend = res.vehiculos - res.con_cc;
-    toast(pend ? `Período guardado. ${pend} patentes necesitan CC.` : "Período guardado. Todas las patentes tienen CC.");
+    toast((pend ? `Período guardado. ${pend} patentes necesitan CC.` : "Período guardado. Todas las patentes tienen CC.")
+      + (pdfErr ? ` No se guardó el PDF de la factura (${pdfErr}); podés subirlo desde el ícono de la factura.` : ""));
   } catch (e) { toast("No se pudo guardar el período: " + errMsg(e)); }
   busy(btn, false, "Guardar y ver totales por CC");
 });
