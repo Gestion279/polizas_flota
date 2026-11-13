@@ -40,6 +40,8 @@ async function rpc(fn, args) {
   const { data, error } = await sb.rpc(fn, args);
   if (error) {
     if (/Usuario no habilitado/.test(error.message || "")) salir("Tu correo ya no está habilitado.");
+    // Si el rol cambió mientras la app estaba abierta, se actualiza la pantalla
+    else if (/Tu rol no permite/.test(error.message || "")) refrescarUsuario().then(renderAll).catch(() => { });
     throw error;
   }
   return data;
@@ -60,8 +62,22 @@ let toastT;
 function toast(t) { const el = $("toast"); el.textContent = t; el.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("on"), 4000); }
 function busy(btn, on, label) { btn.disabled = on; btn.classList.toggle("busy", on); if (label) btn.textContent = label; }
 
+/* ================= Roles y permisos =================
+   La base controla cada operación (seg_puede en la migración 20261115120000_roles_usuarios.sql);
+   acá solo se ocultan los controles que el rol no puede usar. Si cambia el reparto, se ajusta en los dos lugares. */
+const ROLES = { admin: "Administrador", operador: "Operador", lectura: "Lectura" };
+const PERMISOS = {                  // solo el Administrador sube archivos
+  asignar: ["admin", "operador"],   // asignar o quitar CC, fila por fila o en bloque
+  importar: ["admin"],              // importar asignaciones desde Excel (lo limita la app: usa seg_asignar_cc)
+  zonas: ["admin"],                 // actualizar la base de zonas
+  cargar: ["admin"],                // cargar períodos, base de CC y PDF de la factura
+  usuarios: ["admin"]               // hoja Usuarios
+};
+const puede = acc => !!S.user && (PERMISOS[acc] || []).includes(S.user.rol);
+
 /* ================= State ================= */
 const S = {
+  user: null,             // {email, nombre, rol}
   periodos: [],           // filas de seg_periodos
   actual: null,           // id del período visible
   ccBase: [],             // [{codigo, descripcion, habilitado}]
@@ -79,6 +95,7 @@ const P = () => S.periodos.find(p => p.id === S.actual) || null;
 
 /* ================= Carga desde Supabase ================= */
 async function loadMaestros() {
+  await refrescarUsuario();
   const [per, cc, zs, bases, asig] = await Promise.all([
     sb.from("seg_periodos").select("*").order("creado_en", { ascending: false }),
     fetchAll(() => sb.from("seg_centros_costo").select("codigo,descripcion,habilitado").order("codigo")),
@@ -114,7 +131,7 @@ async function reload(opts = {}) {
     if (!opts.soloPeriodo) await loadMaestros();
     await loadPeriodo();
     renderAll();
-  } catch (e) { toast("No se pudieron leer los datos: " + errMsg(e)); }
+  } catch (e) { if (S.user) toast("No se pudieron leer los datos: " + errMsg(e)); }
 }
 
 /* ================= CC ================= */
@@ -153,11 +170,18 @@ function renderAll() {
   buildCC();
   const p = P();
   const sel = $("per");
-  sel.hidden = S.periodos.length < 2; $("newper").hidden = !p; $("exp").hidden = !p; $("tabs").hidden = !p;
+  aplicarRol();
+  sel.hidden = S.periodos.length < 2; $("newper").hidden = !p || !puede("cargar"); $("exp").hidden = !p;
+  $("tabs").hidden = !p && !puede("usuarios");
+  ["t-dash", "t-cc", "t-pat"].forEach(id => $(id).hidden = !p);
+  $("t-usr").hidden = !puede("usuarios");
   sel.innerHTML = S.periodos.map(x => `<option value="${esc(x.id)}" ${x.id === S.actual ? "selected" : ""}>${esc(isoToAr(x.vigencia_desde))} al ${esc(isoToAr(x.vigencia_hasta))} · Fact. ${esc(x.id)}</option>`).join("");
-  if (!p) { $("main").hidden = true; $("invoice").hidden = true; showUpload(true); $("hsub").textContent = "Cargá la póliza, la factura y la base de CC para ver cuánto le toca a cada centro de costo."; return; }
-  if ($("upload").dataset.forced !== "1") $("upload").hidden = true;
-  $("main").hidden = false;
+  if (!p) {
+    $("hsub").textContent = puede("cargar") ? "Cargá la póliza, la factura y la base de CC para ver cuánto le toca a cada centro de costo." : "Todavía no hay períodos cargados.";
+    if (puede("cargar")) showUpload(true);
+    setView(S.view === "usr" ? "usr" : "dash");
+    return;
+  }
   $("hsub").textContent = `Póliza ${p.poliza || ""} · ${p.tomador || ""} · Vigencia ${isoToAr(p.vigencia_desde)} al ${isoToAr(p.vigencia_hasta)} · ${rows.length} vehículos`;
   renderInvoice(p); renderProgress(); renderDash(); renderCC(); renderPat(); setView(S.view);
 }
@@ -197,7 +221,7 @@ function renderCC() {
       <td class="num n" data-l="Patentes">${x.n}</td><td class="num" data-l="Neto">${fmt(x.neto)}</td><td class="num" data-l="IVA">${fmt(x.iva)}</td><td class="num" data-l="Perc. IVA">${fmt(x.perc)}</td><td class="num" data-l="Otros imp.">${fmt(x.otros)}</td><td class="num big">$ ${fmt(x.total)}</td></tr>`;
     if (open) {
       html += `<tr class="detail"><td colspan="9"><div class="chips">${x.pats.slice().sort((a, b) => b.total - a.total).map(r => `<span class="chip"><span class="plate sm"><span>${esc(r.patente)}</span></span><em>${esc(r.marca)}</em>${r.zona ? `<span class="zona">${esc(r.zona)}</span>` : ""}<b>$ ${fmt(r.total)}</b></span>`).join("")}</div>
-      ${x.cc === "" ? `<div style="margin-top:10px"><button class="btn primary" type="button" data-go="none">Asignar CC a estas patentes</button></div>` : ""}</td></tr>`;
+      ${x.cc === "" ? `<div style="margin-top:10px"><button class="btn primary" type="button" data-go="none">${puede("asignar") ? "Asignar CC a estas patentes" : "Ver estas patentes"}</button></div>` : ""}</td></tr>`;
     }
     return html;
   }).join("");
@@ -254,7 +278,7 @@ function fillFil() {
 }
 function renderPat() {
   fillZonas(); fillFil();
-  const v = visible();
+  const v = visible(), editable = puede("asignar");
   $("tb").innerHTML = !v.length ? `<tr><td colspan="13" class="empty">Ninguna patente coincide con la búsqueda o el filtro.</td></tr>` :
     v.map(r => {
       const st = ccStatus(r.cc); return `<tr data-p="${esc(r.patente)}" class="${S.sel.has(r.patente) ? "sel" : ""}">
@@ -263,7 +287,9 @@ function renderPat() {
       <td class="pat"><span class="plate"><span>${esc(r.patente)}</span></span>${r.nuevo ? '<span class="new">Nueva</span>' : ""}</td>
       <td class="marca">${esc(r.marca)}<small>${esc(r.anio)}</small></td>
       <td class="zn">${r.zona ? `<span class="zona">${esc(r.zona)}</span>` : `<span class="zona none">Sin zona</span>`}</td>
-      <td class="ccc"><div class="cc ${st.cls}"><button type="button" class="ccbtn${r.cc ? "" : " empty"}" aria-haspopup="dialog" aria-expanded="false" aria-label="Centro de costo de ${esc(r.patente)}: ${esc(r.cc ? r.cc + ", " + st.txt : "sin asignar")}"><span class="v">${r.cc ? esc(r.cc) : "Elegir CC"}</span><span class="arr" aria-hidden="true"></span></button><small title="${esc(st.txt)}">${esc(st.txt)}</small></div></td>
+      <td class="ccc"><div class="cc ${st.cls}">${editable
+        ? `<button type="button" class="ccbtn${r.cc ? "" : " empty"}" aria-haspopup="dialog" aria-expanded="false" aria-label="Centro de costo de ${esc(r.patente)}: ${esc(r.cc ? r.cc + ", " + st.txt : "sin asignar")}"><span class="v">${r.cc ? esc(r.cc) : "Elegir CC"}</span><span class="arr" aria-hidden="true"></span></button>`
+        : `<span class="ccbtn ro${r.cc ? "" : " empty"}"><span class="v">${r.cc ? esc(r.cc) : "Sin CC"}</span></span>`}<small title="${esc(st.txt)}">${esc(st.txt)}</small></div></td>
       <td class="num" data-l="Premio">${fmt(r.base)}</td><td class="num" data-l="%">${fmtPct(r.pct)}</td>
       <td class="num" data-l="Neto">${fmt(r.neto)}</td><td class="num" data-l="IVA">${fmt(r.iva)}</td><td class="num" data-l="Perc. IVA">${fmt(r.perc)}</td><td class="num" data-l="Otros imp.">${fmt(r.otros)}</td>
       <td class="num tot" data-l="Total">${fmt(r.total)}</td></tr>`;
@@ -280,18 +306,26 @@ function renderPat() {
   syncBulk();
 }
 function setView(v) {
+  if (v === "usr" && !puede("usuarios")) v = "dash";
+  const p = P(), usr = v === "usr", antes = S.view;
   S.view = v;
+  $("usrview").hidden = !usr;
+  $("main").hidden = !p || usr;
   $("dashview").hidden = v !== "dash"; $("tblpanel").hidden = v === "dash";
   $("ccview").hidden = v !== "cc"; $("patview").hidden = v !== "pat";
   // En el Dashboard los importes de la factura ya están en los indicadores
-  $("invoice").hidden = !P() || v === "dash";
-  ["dash", "cc", "pat"].forEach(x => $("t-" + x).setAttribute("aria-selected", v === x));
+  $("invoice").hidden = !p || v === "dash" || usr;
+  // La carga de período se ve si no hay ninguno o si se pidió con «Cargar nuevo período»
+  $("upload").hidden = usr || !puede("cargar") || !(!p || $("upload").dataset.forced === "1");
+  $("sinper").hidden = usr || !!p || puede("cargar");
+  ["dash", "cc", "pat", "usr"].forEach(x => $("t-" + x).setAttribute("aria-selected", v === x));
+  if (usr && antes !== "usr") loadUsuarios();
 }
 function refreshViews() { const y = scrollY; renderProgress(); renderDash(); renderCC(); renderPat(); scrollTo(0, y); }
 
 /* ================= Asignación ================= */
 async function assign(pats, code) {
-  const p = P(); if (!p || !pats.length) return false;
+  const p = P(); if (!p || !pats.length || !puede("asignar")) return false;
   if (code && !ccHabilitado(code)) { toast(ccMap.has(code) ? `El CC ${code} está inhabilitado; elegí uno habilitado.` : `El CC ${code} no está en la base.`); return false; }
   const prev = new Map(rows.filter(r => pats.includes(r.patente)).map(r => [r.patente, { cc: r.cc, nuevo: r.nuevo }]));
   rows.forEach(r => { if (prev.has(r.patente)) { r.cc = code; r.nuevo = false; } });
@@ -311,6 +345,7 @@ $("tb").addEventListener("change", e => {
 });
 const rowBtn = pt => $("tb").querySelector(`tr[data-p="${CSS.escape(pt)}"] .ccbtn`);
 function pickRow(btn) {
+  if (!puede("asignar") || btn.tagName !== "BUTTON") return;
   const pt = btn.closest("tr").dataset.p, r = rows.find(x => x.patente === pt); if (!r) return;
   openPicker(btn, {
     title: "Centro de costo de " + pt, cur: r.cc, allowNone: true,
@@ -364,6 +399,7 @@ $("zf").addEventListener("change", e => { S.zf = e.target.value; S.sel.clear(); 
 $("t-dash").addEventListener("click", () => setView("dash"));
 $("t-cc").addEventListener("click", () => setView("cc"));
 $("t-pat").addEventListener("click", () => setView("pat"));
+$("t-usr").addEventListener("click", () => setView("usr"));
 function toggleCC(row) { const k = row.dataset.k; S.open.has(k) ? S.open.delete(k) : S.open.add(k); renderCC(); }
 $("ccb").addEventListener("click", e => {
   if (e.target.closest("[data-go]")) { S.fil = "none"; S.zf = ""; S.sel.clear(); setView("pat"); renderPat(); return; }
@@ -710,7 +746,7 @@ async function guardarFacturaPdf(id, file) {
 }
 function renderPdfBtn(p) {
   const has = !!(S.pdfs && S.pdfs[p.id]);
-  const t = has ? `Ver el PDF de la factura ${p.id}` : `La factura ${p.id} no tiene el PDF guardado: tocá para subirlo`;
+  const t = has ? `Ver el PDF de la factura ${p.id}` : puede("cargar") ? `La factura ${p.id} no tiene el PDF guardado: tocá para subirlo` : `La factura ${p.id} no tiene el PDF guardado`;
   ["i-pdf", "d-pdf"].forEach(id => {
     const b = $(id);
     b.classList.toggle("missing", !has);
@@ -727,8 +763,10 @@ function pdfClear() {
 function pdfSinArchivo(p) {
   pdfMsg(`<img src="/factura-pdf.png" alt="" width="72" height="72">
     <b>Esta factura no tiene el PDF guardado</b>
-    <p>Se cargó antes de que la aplicación guardara los PDF. Subí el PDF de la factura ${esc(p.id)} y queda guardado para todos.</p>
-    <button type="button" class="btn primary" id="pdfv-up">Subir el PDF de la factura</button>`);
+    ${puede("cargar")
+      ? `<p>Se cargó antes de que la aplicación guardara los PDF. Subí el PDF de la factura ${esc(p.id)} y queda guardado para todos.</p>
+    <button type="button" class="btn primary" id="pdfv-up">Subir el PDF de la factura</button>`
+      : `<p>Se cargó antes de que la aplicación guardara los PDF. Un administrador puede subirlo desde este mismo visor.</p>`}`);
 }
 async function openPdf(e) {
   const p = P(); if (!p) return;
@@ -856,7 +894,7 @@ addEventListener("resize", () => { if (!$("pdfv").hidden && PV.bytes) { clearTim
 async function readSheet(file) { const wb = XLSX.read(await file.arrayBuffer(), { type: "array" }); return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: false }); }
 const isCCHeader = c => ["cc", "centro de costo", "centro de costos"].includes(normH(c));
 
-$("imp").addEventListener("click", () => $("impf").click());
+$("imp").addEventListener("click", () => { if (puede("importar")) $("impf").click(); });
 $("impf").addEventListener("change", async e => {
   const f = e.target.files[0]; e.target.value = ""; if (!f) return;
   try {
@@ -898,7 +936,7 @@ async function parseZonas(f) {
 async function guardarZonas(z) {
   await rpc("seg_reemplazar_zonas", { p_items: Object.entries(z.map).map(([patente, zona]) => ({ patente, zona })), p_archivo: z.archivo, p_conflictos: z.conflictos });
 }
-$("impz").addEventListener("click", () => $("impzf").click());
+$("impz").addEventListener("click", () => { if (puede("zonas")) $("impzf").click(); });
 $("impzf").addEventListener("change", async e => {
   const f = e.target.files[0]; e.target.value = ""; if (!f) return;
   const z = await parseZonas(f);
@@ -912,11 +950,12 @@ $("impzf").addEventListener("change", async e => {
 
 /* ================= Carga de período ================= */
 function showUpload(on, forced) {
-  $("upload").hidden = !on; $("upload").dataset.forced = forced ? "1" : "";
+  if (!puede("cargar")) on = false;
+  $("upload").hidden = !on; $("upload").dataset.forced = on && forced ? "1" : "";
   $("cancel").hidden = !P();
   if (on) renderUpload();
 }
-$("newper").addEventListener("click", () => { S.up = { poliza: null, factura: null, cc: null, zona: null }; showUpload(true, true); $("upload").scrollIntoView({ behavior: "smooth" }); });
+$("newper").addEventListener("click", () => { if (!puede("cargar")) return; if (S.view === "usr") setView("dash"); S.up = { poliza: null, factura: null, cc: null, zona: null }; showUpload(true, true); $("upload").scrollIntoView({ behavior: "smooth" }); });
 $("cancel").addEventListener("click", () => { showUpload(false); renderAll(); });
 const drop = $("drop");
 drop.addEventListener("click", () => $("files").click());
@@ -1107,12 +1146,104 @@ function exportXlsx() {
 }
 $("exp").addEventListener("click", () => { const m = rows.filter(r => !r.cc).length; if (m) toast(`Exportando con ${m} patentes sin CC; figuran como «Sin CC».`); exportXlsx(); });
 
+/* ================= Usuarios (solo Administrador) =================
+   Alta, rol y estado de cada usuario, y su actividad. Todo pasa por funciones
+   de la base que controlan que quien consulta sea administrador. */
+const ACCIONES = {
+  ingreso: "Ingresó", asignar_cc: "Asignó CC", quitar_cc: "Quitó CC", zonas: "Actualizó zonas",
+  base_cc: "Actualizó la base de CC", periodo: "Cargó un período", factura_pdf: "Subió el PDF de la factura",
+  usuario_alta: "Agregó un usuario", usuario_cambio: "Modificó un usuario"
+};
+const U = { lista: [], token: 0 };
+const fechaHora = t => t ? new Date(t).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+async function loadUsuarios() {
+  try {
+    U.lista = await rpc("seg_usuarios_listar") || [];
+    renderUsuarios();
+    await loadActividad();
+  } catch (e) { $("ub").innerHTML = `<tr><td colspan="6" class="empty">No se pudieron leer los usuarios: ${esc(errMsg(e))}</td></tr>`; }
+}
+function renderUsuarios() {
+  const yo = S.user?.email;
+  $("ub").innerHTML = !U.lista.length ? `<tr><td colspan="6" class="empty">No hay usuarios.</td></tr>` : U.lista.map(u => {
+    const n = +u.ingresos || 0, nombre = u.nombre || u.email;
+    return `<tr data-e="${esc(u.email)}" class="${u.activo ? "" : "off"}">
+      <td class="un"><button type="button" class="linkbtn" data-act="${esc(u.email)}" title="Ver la actividad de ${esc(nombre)}">${esc(nombre)}</button>${u.email === yo ? '<span class="yo">Vos</span>' : ""}</td>
+      <td class="ue">${esc(u.email)}</td>
+      <td class="ur"><select class="txt" aria-label="Rol de ${esc(nombre)}">${Object.entries(ROLES).map(([k, l]) => `<option value="${k}" ${k === u.rol ? "selected" : ""}>${l}</option>`).join("")}</select></td>
+      <td class="ua"><label class="sw"><input type="checkbox" ${u.activo ? "checked" : ""} aria-label="${esc(nombre)} activo"><span>${u.activo ? "Sí" : "No"}</span></label></td>
+      <td class="num ui" data-l="Ingresó">${n ? (n === 1 ? "1 vez" : `${fmtInt(n)} veces`) : "—"}</td>
+      <td class="ul" data-l="Último ingreso">${u.ultimo_ingreso ? esc(fechaHora(u.ultimo_ingreso)) : "—"}</td>
+    </tr>`;
+  }).join("");
+  const sel = $("act-u"), cur = sel.value;
+  sel.innerHTML = `<option value="">Todos los usuarios</option>` + U.lista.map(u => `<option value="${esc(u.email)}">${esc(u.nombre || u.email)}${u.activo ? "" : " (desactivado)"}</option>`).join("");
+  sel.value = U.lista.some(u => u.email === cur) ? cur : "";
+}
+async function loadActividad() {
+  const tok = ++U.token, email = $("act-u").value, tipo = $("act-tipo").value, LIM = 200;
+  $("ab").innerHTML = `<tr><td colspan="4" class="empty">Cargando actividad…</td></tr>`; $("act-n").textContent = "";
+  try {
+    const data = await rpc("seg_actividad_listar", { p_email: email || null, p_tipo: tipo, p_limite: LIM }) || [];
+    if (tok !== U.token) return;
+    $("ab").innerHTML = !data.length ? `<tr><td colspan="4" class="empty">Sin movimientos ${tipo === "ingresos" ? "de ingreso " : ""}registrados${email ? " para este usuario" : ""}.</td></tr>`
+      : data.map(a => `<tr class="ac-${esc(a.accion)}">
+        <td class="af">${esc(fechaHora(a.en))}</td>
+        <td class="au">${esc(a.nombre || a.email)}</td>
+        <td class="aa">${esc(ACCIONES[a.accion] || a.accion)}</td>
+        <td class="ad">${esc(a.detalle)}</td></tr>`).join("");
+    $("act-n").textContent = data.length >= LIM ? `Se muestran los últimos ${LIM} movimientos.` : "";
+  } catch (e) { if (tok === U.token) $("ab").innerHTML = `<tr><td colspan="4" class="empty">No se pudo leer la actividad: ${esc(errMsg(e))}</td></tr>`; }
+}
+async function cambiarUsuario(email, cambios) {
+  const u = U.lista.find(x => x.email === email); if (!u) return;
+  const propio = email === S.user?.email;
+  if (propio && cambios.rol && cambios.rol !== "admin" && !confirm(`Vas a pasar a ${ROLES[cambios.rol]} y dejar de ver esta hoja. ¿Continuar?`)) return renderUsuarios();
+  if (propio && cambios.activo === false && !confirm("Vas a desactivar tu propio usuario y salir de la aplicación. ¿Continuar?")) return renderUsuarios();
+  try {
+    const r = await rpc("seg_usuario_cambiar", { p_email: email, p_nombre: null, p_rol: cambios.rol ?? null, p_activo: cambios.activo ?? null });
+    Object.assign(u, r);
+    toast(cambios.rol ? `${u.nombre || email}: rol ${ROLES[r.rol]}.` : `${u.nombre || email}: ${r.activo ? "activado" : "desactivado"}.`);
+    if (propio) { await refrescarUsuario(); renderAll(); if (S.view !== "usr") return; }
+    renderUsuarios(); loadActividad();
+  } catch (e) { toast("No se guardó el cambio: " + errMsg(e)); renderUsuarios(); }
+}
+$("ub").addEventListener("change", e => {
+  const tr = e.target.closest("tr[data-e]"); if (!tr) return;
+  if (e.target.matches("select")) cambiarUsuario(tr.dataset.e, { rol: e.target.value });
+  else if (e.target.matches("input[type=checkbox]")) cambiarUsuario(tr.dataset.e, { activo: e.target.checked });
+});
+$("ub").addEventListener("click", e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  $("act-u").value = b.dataset.act; loadActividad();
+  $("act-t").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth" });
+});
+$("act-u").addEventListener("change", loadActividad);
+$("act-tipo").addEventListener("change", loadActividad);
+$("uadd").addEventListener("submit", async e => {
+  e.preventDefault();
+  const nombre = $("ua-nombre").value.trim().replace(/\s+/g, " "), email = $("ua-email").value.trim().toLowerCase(), rol = $("ua-rol").value, btn = $("ua-btn");
+  const err = m => { $("ua-err").textContent = m; };
+  if (!nombre) { err("Escribí el nombre."); return $("ua-nombre").focus(); }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err("Escribí un correo válido."); return $("ua-email").focus(); }
+  if (U.lista.some(u => u.email === email)) { err("Ese correo ya está en la lista. Si está desactivado, activalo desde la tabla."); return $("ua-email").focus(); }
+  err(""); busy(btn, true, "Agregando…");
+  try {
+    await rpc("seg_usuario_alta", { p_email: email, p_nombre: nombre, p_rol: rol });
+    $("uadd").reset();
+    toast(`Usuario agregado: ${nombre} (${ROLES[rol]}). Ya puede ingresar con ${email}.`);
+    await loadUsuarios();
+  } catch (e2) { err("No se agregó el usuario: " + errMsg(e2)); }
+  busy(btn, false, "Agregar usuario");
+});
+
 /* ================= Ingreso ================= */
 const LS_USER = "seg-usuario";
 function screen(name) {
   $("loading").hidden = name !== "loading"; $("login").hidden = name !== "login"; $("app").hidden = name !== "app";
 }
 function salir(msg) {
+  S.user = null;
   localStorage.removeItem(LS_USER);
   conectar(null);
   $("lemail").value = ""; $("lerr").textContent = msg || "";
@@ -1122,12 +1253,32 @@ async function validar(email) {
   conectar(null);
   const { data, error } = await sb.rpc("seg_ingresar", { p_email: email });
   if (error) throw error;
-  return data; // {email, nombre} o null
+  return data; // {email, nombre, rol} o null
+}
+function setUsuario(u) {
+  S.user = u;
+  localStorage.setItem(LS_USER, JSON.stringify(u));
+  $("uemail").textContent = u.nombre ? `${u.nombre} (${u.email})` : u.email;
+  $("urol").textContent = ROLES[u.rol] || "";
+}
+// Vuelve a leer nombre y rol sin registrar un ingreso; si lo desactivaron, sale
+async function refrescarUsuario() {
+  if (!S.user) return;
+  const u = await rpc("seg_mi_usuario");
+  if (!u) { salir("Tu correo ya no está habilitado."); throw new Error("Tu correo ya no está habilitado."); }
+  if (u.rol !== S.user.rol || u.nombre !== S.user.nombre) setUsuario(u);
+}
+function aplicarRol() {
+  const asigna = puede("asignar");
+  document.body.classList.toggle("ro-asignar", !asigna);
+  if (!asigna && S.sel.size) { S.sel.clear(); S.bulkCC = ""; }
+  $("imp").hidden = !puede("importar");
+  $("impz").hidden = !puede("zonas");
 }
 async function entrar(u) {
-  localStorage.setItem(LS_USER, JSON.stringify(u));
+  setUsuario(u);
   conectar(u.email);
-  $("uemail").textContent = u.nombre ? `${u.nombre} (${u.email})` : u.email;
+  aplicarRol();
   screen("loading");
   try {
     await loadMaestros(); await loadPeriodo();

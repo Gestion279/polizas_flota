@@ -236,6 +236,9 @@ select.txt:disabled{opacity:.6}
   header.top{flex-wrap:wrap;row-gap:12px}
   header.top>div:first-child{flex:1 1 0;min-width:440px}
   header.top .tabs{flex-wrap:nowrap}
+  /* Las pestañas no se parten: con la de Usuarios, el resto del encabezado se acomoda */
+  header.top .tabs button{white-space:nowrap}
+  header.top>div:first-child{min-width:max(440px,fit-content)}
   .hright{flex:1 1 0;min-width:0;justify-content:flex-end}
   #per{flex:0 1 200px;max-width:340px;min-width:150px}
   #newper,#exp{flex:none}
@@ -746,3 +749,97 @@ body.pdfv-on{overflow:hidden}
   .pdfv-body{padding:10px 8px calc(10px + env(safe-area-inset-bottom,0px));background:color-mix(in srgb,var(--ink) 10%,var(--paper))}
 }
 @media (pointer:coarse){.pdfv-act .btn{min-height:40px} .pdfv-x{width:40px;height:40px}}
+
+/* ==========================================================================
+   Roles: rol en el encabezado y controles de solo lectura
+   ========================================================================== */
+.urol{font:600 11.5px var(--sans);color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:10px;padding:1px 8px}
+.urol:empty{display:none}
+.ro-asignar #patview .th-chk,.ro-asignar #patview td.chk{display:none}
+.ccbtn.ro{cursor:default;background:transparent;border-style:dashed}
+.sinper{padding:28px 24px;margin-bottom:18px}
+.sinper p{color:var(--muted);margin:6px 0 0;max-width:70ch}
+
+/* ==========================================================================
+   Hoja Usuarios (solo Administrador)
+   ========================================================================== */
+.usr{padding:22px 24px 26px;margin-bottom:18px}
+.usr h2{font:700 21px/1.2 var(--sans);color:var(--ink);margin:0 0 14px}
+.usr-sub{margin:0 0 16px;max-width:66ch;color:var(--ink)}
+.usr h3{font:700 16px var(--sans);color:var(--ink);margin:0}
+.usr .tablewrap{border:1px solid var(--line);border-radius:8px}
+.utable,.atable{font-size:13.5px}
+.utable th,.atable th{color:var(--ink);font-size:13px;padding:11px 14px}
+.utable td,.atable td{padding:9px 14px}
+.utable tbody tr:last-child td,.atable tbody tr:last-child td{border-bottom:0}
+.utable td.un{white-space:nowrap}
+.utable td.un .linkbtn{color:var(--ink);font:600 13.5px var(--sans);text-align:left}
+.utable td.un .linkbtn:hover{color:var(--accent)}
+.utable td.ue{color:var(--muted);word-break:break-all}
+.utable td.ur select{padding:5px 8px;min-width:150px}
+.utable td.ui,.utable td.ul{white-space:nowrap}
+.utable td.ul{color:var(--muted)}
+.yo{font:600 11px var(--sans);color:var(--muted);background:var(--barbg);border-radius:10px;padding:1px 7px;margin-left:8px}
+.utable tr.off td.un .linkbtn,.utable tr.off td.ue,.utable tr.off td.ui{color:var(--muted)}
+.utable tr.off td.un .linkbtn{text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--muted) 60%,transparent)}
+.sw{display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+.sw span{font-size:13px}
+
+.uadd{margin-top:20px;padding:16px;border:1px dashed var(--line);border-radius:8px}
+.uadd-f{display:grid;grid-template-columns:minmax(160px,1fr) minmax(220px,1.4fr) minmax(150px,.7fr) auto;gap:10px 12px;align-items:end;margin-top:10px}
+.uadd label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted)}
+.uadd .txt{width:100%}
+.uadd .err{color:var(--bad);font-size:13px;margin:8px 0 0;min-height:1em}
+.uadd .err:empty{display:none}
+
+.roles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:16px 0 0}
+.roles div{border-left:3px solid var(--line);padding:2px 0 2px 12px}
+.roles dt{font:600 13.5px var(--sans)}
+.roles dd{margin:2px 0 0;font-size:12.5px;color:var(--muted)}
+
+.act-h{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:28px 0 12px}
+.act-h h3{margin-right:auto}
+.atable td.af{white-space:nowrap;color:var(--muted)}
+.atable td.au{white-space:nowrap}
+.atable td.aa{white-space:nowrap;font-weight:600}
+.atable tr.ac-ingreso td.aa{font-weight:400;color:var(--muted)}
+.act-n{font-size:12.5px;color:var(--muted);margin:8px 0 0}
+.act-n:empty{display:none}
+
+@media (max-width:900px){
+  .uadd-f{grid-template-columns:1fr 1fr}
+  .uadd-f .btn{grid-column:1 / -1}
+  .roles{grid-template-columns:1fr}
+}
+@media (max-width:760px){
+  .usr{padding:16px}
+  .uadd-f{grid-template-columns:1fr}
+  .act-h select{flex:1 1 calc(50% - 5px)}
+  .act-h h3{flex:1 1 100%}
+  /* Usuarios como tarjetas */
+  .usr .tablewrap{overflow:visible}
+  .utable,.utable tbody{display:block}
+  .utable thead{display:none}
+  .utable tbody tr[data-e]{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;padding:12px 14px;border-bottom:1px solid var(--line);
+    grid-template-areas:"un ua" "ue ue" "ur ur" "ui ul"}
+  .utable tbody tr[data-e]:last-child{border-bottom:0}
+  .utable tbody tr[data-e] td{display:block;padding:0;border:0}
+  .utable td.un{grid-area:un;white-space:normal}
+  .utable td.ue{grid-area:ue}
+  .utable td.ur{grid-area:ur} .utable td.ur select{width:100%}
+  .utable td.ua{grid-area:ua;justify-self:end}
+  .utable td.ui{grid-area:ui;text-align:left}
+  .utable td.ul{grid-area:ul;text-align:right}
+  .utable td.ui::before,.utable td.ul::before{content:attr(data-l);display:block;font-size:11.5px;color:var(--muted)}
+  /* Actividad como lista */
+  .atable,.atable tbody{display:block}
+  .atable thead{display:none}
+  .atable tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+  .atable tbody tr:last-child{border-bottom:0}
+  .atable tbody td{display:block;padding:0;border:0}
+  .atable td.aa{order:1} .atable td.af{order:2;text-align:right;font-size:12px}
+  .atable td.au{order:3;grid-column:1 / -1;font-size:12.5px;color:var(--muted)}
+  .atable td.ad{order:4;grid-column:1 / -1;font-size:13px;word-break:break-word}
+  .atable td.empty{grid-column:1 / -1}
+}
+@media (pointer:coarse){.utable td.ur select{min-height:44px}}
