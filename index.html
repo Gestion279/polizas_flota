@@ -110,7 +110,6 @@
             <option value="marca:1">Ordenar por marca</option>
           </select>
           <button class="btn" id="fclear" type="button" hidden>Limpiar filtros</button>
-          <label class="offchk"><input type="checkbox" id="showoff"> Ofrecer CC inhabilitados</label>
           <span class="grow"></span>
           <button class="btn imp" id="impz" type="button">Actualizar zonas</button>
           <input type="file" id="impzf" accept=".xlsx,.xls" hidden>
@@ -119,7 +118,7 @@
         </div>
         <div class="bulk" id="bulk">
           <b id="bulk-n"></b>
-          <div class="cc bulk-cc"><input id="bulk-cc" list="cclist" placeholder="Centro de costo para todas" aria-label="Centro de costo para las seleccionadas"></div>
+          <div class="cc bulk-cc"><button type="button" class="ccbtn empty" id="bulk-cc" aria-haspopup="dialog" aria-expanded="false" aria-label="Centro de costo para las seleccionadas"><span class="v">Centro de costo para todas</span><span class="arr" aria-hidden="true"></span></button></div>
           <button class="btn primary" id="bulk-ok" type="button">Asignar a seleccionadas</button>
           <button class="btn" id="bulk-clear" type="button">Quitar CC</button>
           <button class="btn" id="bulk-x" type="button">Cancelar selección</button>
@@ -136,10 +135,22 @@
           <tfoot id="tf"></tfoot>
         </table></div>
       </div>
-      <datalist id="cclist"></datalist>
     </section>
   </div>
   </div>
+</div>
+<!-- Menú de centros de costo, estilo autofiltro de Excel -->
+<div class="ccpop-bg" id="ccpop-bg" hidden></div>
+<div class="ccpop" id="ccpop" role="dialog" aria-modal="false" aria-labelledby="ccpop-t" hidden>
+  <div class="ccpop-h"><b id="ccpop-t">Centro de costo</b><button type="button" class="ccpop-x" id="ccpop-x" aria-label="Cerrar">×</button></div>
+  <div class="ccpop-s">
+    <input type="search" id="ccpop-q" placeholder="Buscar CC o nombre" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="true" aria-controls="ccpop-l" aria-autocomplete="list" aria-label="Buscar CC o nombre">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.8" cy="6.8" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10.3 10.3 14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+  </div>
+  <div class="ccpop-warn" id="ccpop-warn" hidden></div>
+  <div class="ccpop-l" id="ccpop-l" role="listbox" aria-label="Centros de costo habilitados"></div>
+  <div class="ccpop-n" id="ccpop-n" aria-live="polite"></div>
+  <div class="ccpop-f"><button type="button" class="btn primary" id="ccpop-ok">Aceptar</button><button type="button" class="btn" id="ccpop-no">Cancelar</button></div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script type="module" src="/src/main.js"></script>

@@ -14,7 +14,7 @@ Cada semestre se suben la póliza (PDF), la factura (PDF) y, si cambiaron, la ba
 
 ### 1. Supabase
 
-1. En el proyecto, abrí **SQL Editor**, pegá el contenido completo de `supabase/migrations/20261112120000_seguros_cc.sql` y ejecutalo. Crea las tablas, las vistas y las funciones. Después ejecutá `supabase/migrations/20261112150000_prorrateo_solo_premio.sql`, que fija el prorrateo por premio. Los dos se pueden ejecutar más de una vez sin perder datos. Si usás la CLI, alcanza con `supabase db push`.
+1. En el proyecto, abrí **SQL Editor**, pegá el contenido completo de `supabase/migrations/20261112120000_seguros_cc.sql` y ejecutalo. Crea las tablas, las vistas y las funciones. Después ejecutá `supabase/migrations/20261112150000_prorrateo_solo_premio.sql`, que fija el prorrateo por premio, y `supabase/migrations/20261113120000_cc_solo_habilitados.sql`, que impide guardar asignaciones con CC inhabilitados. Los dos se pueden ejecutar más de una vez sin perder datos. Si usás la CLI, alcanza con `supabase db push`.
 2. Ejecutá `supabase/usuarios.sql` para cargar los correos habilitados.
    - Para agregar a alguien, sumá una línea en ese archivo y volvé a ejecutarlo.
    - Para dar de baja a alguien: `update public.seg_usuarios set activo = false where email = 'correo@fabricasrl.com.ar';`
@@ -51,11 +51,11 @@ Requiere Node 22.12 o superior.
 2. **Cargar nuevo período** → arrastrá los archivos juntos. La aplicación reconoce cada uno:
    - **Póliza** (PDF): de cada certificado toma patente, marca completa, año, valor del vehículo y premio.
    - **Factura** (PDF): toma neto, IVA, percepción, otros impuestos y total.
-   - **Base de CC** (Excel con columnas `CC`, `Descripción`, `Habilitado`).
+   - **Base de CC** (Excel con columnas `CC`, `Descripción` y `Habilitado` en la columna C). Solo los CC con `VERDADERO` en «Habilitado» se pueden asignar.
    - **Zonas** (Excel con columnas `Patente`, `Zona`), opcional.
 3. Revisá los controles (cantidad de certificados, total de factura contra premio final de la póliza, patentes sin zona) y guardá.
 4. En **Totales por CC** está el monto por centro de costo. Si tocás un CC, se ven sus patentes.
-5. En **Patentes y asignación** se asigna el CC: fila por fila, o en bloque filtrando por zona y seleccionando todas. También se puede importar un Excel con columnas `Patente` y `CC`.
+5. En **Patentes y asignación** se asigna el CC: fila por fila, o en bloque filtrando por zona y seleccionando todas. El botón con la flecha abre un menú como el autofiltro de Excel: un buscador por código o nombre (sin importar mayúsculas ni tildes), la lista de CC habilitados con un casillero cada uno, y **Aceptar** / **Cancelar**. Con el teclado: ↓ o F4 abre el menú, ↑ ↓ recorren la lista, Enter acepta la opción marcada y Esc cancela. Si una patente tiene un CC que quedó inhabilitado, se marca en amarillo y el menú pide elegir otro. También se puede importar un Excel con columnas `Patente` y `CC`; las filas con CC inhabilitados se omiten y se informan.
 6. **Exportar a Excel** genera tres hojas: totales por CC, detalle por patente y datos de la factura.
 
 El prorrateo se hace por **valor del vehículo** por defecto. Se puede cambiar a **premio del certificado** con el selector. Cada concepto se reparte al centavo con el método del mayor resto, así cada columna suma exactamente lo facturado.
